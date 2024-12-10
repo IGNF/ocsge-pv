@@ -1,0 +1,33 @@
+ci-cd:
+- changed-files:
+  - any-glob-to-any-file:
+    - .github/**
+
+dependencies:
+- changed-files:
+  - any-glob-to-any-file:
+    - requirements.txt
+    - requirements/*.txt
+
+documentation:
+- changed-files:
+  - any-glob-to-any-file:
+    - docs/**
+
+enhancement:
+- changed-files:
+  - any-glob-to-any-file:
+    - src/**
+
+quality:
+- changed-files:
+  - any-glob-to-any-file:
+    - tests/**
+
+tooling:
+- changed-files:
+  - any-glob-to-any-file:
+    - .gitignore
+    - .pre-commit-config.yaml
+    - setup.cfg
+    - pyproject.toml

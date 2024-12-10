@@ -1,0 +1,150 @@
+name: Test, build and publish artefacts and documentation
+
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+      - '[0-9]+.[0-9]+.[0-9]+b[0-9]+'
+
+jobs:
+
+  create_release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      job_status: ${{ job.status }}
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Create Release
+        id: create_release
+        uses: ncipollo/release-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          generateReleaseNotes: true
+          draft: false
+          prerelease: ${{ contains(github.ref_name ,'b') }}
+
+  build_and_test:
+
+    name: Test and build artefacts
+    needs: create_release
+    outputs:
+      job_status: ${{ job.status }}
+    strategy:
+      max-parallel: 2
+      fail-fast: true
+      matrix:
+        include:
+          - os: ubuntu-20.04
+            python-version: "3.8"
+          - os: ubuntu-22.04
+            python-version: "3.10"
+          - os: ubuntu-24.04
+            python-version: "3.12"
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+          cache-dependency-path: '**/pyproject.toml'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt update
+          sudo apt -y install python3-gdal
+
+      - name: Install python dependencies
+        run: |
+          python3 -m venv .venv
+          source .venv/bin/activate
+          python3 -m pip install --upgrade build bump2version
+          bump2version --current-version 0.0.0 --new-version ${{ github.ref_name }} patch
+          pip install -e .
+
+      - name: Run unit tests
+        run: |
+          source .venv/bin/activate
+          pip install -e .[test]
+          coverage run -m pytest
+          coverage report -m
+
+      - name: Build unit tests report
+        if: "! contains(github.ref_name,'b') && matrix.os == 'ubuntu-24.04' && matrix.python-version == '3.12'"
+        run: |
+          source .venv/bin/activate
+          coverage html -d target/docs/tests/
+          rm target/docs/tests/.gitignore
+
+      - name: Build package
+        if: "matrix.os == 'ubuntu-24.04' && matrix.python-version == '3.12'"
+        run: |
+          source .venv/bin/activate
+          python3 -m build
+
+      - name: Build documentation
+        if: "! contains(github.ref_name,'b') && matrix.os == 'ubuntu-24.04' && matrix.python-version == '3.12'"
+        run: |
+          source .venv/bin/activate
+          pip install -e .[doc]
+          pdoc3 --html --output-dir target/docs/ rok4_tools
+          cp docs/mkdocs.yml target/mkdocs.yml
+          cp -r docs/overrides target/
+          cp -r docs/images target/docs/
+          cp docs/unit-tests.md target/docs/unit-tests.md
+          cp docs/documentation.md target/docs/documentation.md
+          cp docs/README.hdr.md target/docs/README.md
+          cp docs/CHANGELOG.hdr.md target/docs/CHANGELOG.md
+          cp docs/CONTRIBUTING.hdr.md target/docs/CONTRIBUTING.md
+          sed "s#x.y.z#${{ github.ref_name }}#g" README.md >>target/docs/README.md
+          sed -i "s#](./docs/images/#](./images/#g" target/docs/README.md
+          cat CHANGELOG.md >>target/docs/CHANGELOG.md
+          cat CONTRIBUTING.md >>target/docs/CONTRIBUTING.md
+
+      - name: Upload packages
+        if: "matrix.os == 'ubuntu-24.04' && matrix.python-version == '3.12'"
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-py3
+          path: dist/
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Publish documentation
+        if: "! contains(github.ref_name,'b') && matrix.os == 'ubuntu-24.04' && matrix.python-version == '3.12'"
+        run: |
+          source .venv/bin/activate
+          pip install -r docs/requirements.txt
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          cd target/
+          mike deploy --push --update-aliases --branch gh-pages -t "Version ${{ github.ref_name }}" ${{ github.ref_name }} latest
+          mike set-default --push --branch gh-pages ${{ github.ref_name }}
+
+  delete_version:
+    name: Remove release and tag if error occured
+    needs: build_and_test
+    if: "always() && needs.create_release.outputs.job_status == 'success' && needs.build_and_test.outputs.job_status != 'success'"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Remove release and tag
+        uses: dev-drprasad/delete-tag-and-release@v1.1
+        with:
+          tag_name: ${{ github.ref_name }}
+          delete_release: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

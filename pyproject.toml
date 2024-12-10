@@ -1,0 +1,15 @@
+[project]
+
+name = "ocsge-pv"
+version = "0.0.0"
+
+description = "Python tools for generation of the photovoltaic data used in OCSGE from IGN France"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {file = "LICENSE.md"}
+
+keywords = []
+
+authors = [
+  {name = "Géoportail Developer", email = "tout_rdev@ign.fr" }
+]
