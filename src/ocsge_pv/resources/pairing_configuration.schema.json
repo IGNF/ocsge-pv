@@ -1,0 +1,90 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "pairing_configuration",
+    "title": "Pairing configuration",
+    "description": "The configuration for the pairing program",
+    "type": "object",
+    "properties": {
+        "target_database": {
+            "description": "Credentials and other informations about the targeted database",
+            "type": "object",
+            "properties": {
+                "host": {
+                    "description": "Database hostname",
+                    "type": "string",
+                    "oneOf": [
+                        {
+                            "format": "hostname"
+                        },
+                        {
+                            "format": "ipv4"
+                        },
+                        {
+                            "format": "ipv6"
+                        }
+                    ]
+                },
+                "port": {
+                    "description": "Database host's port",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "Database's name on the host server",
+                    "type": "string",
+                    "pattern": "^[a-z_]+$"
+                },
+                "user": {
+                    "description": "User's name",
+                    "type": "string",
+                    "pattern": "^[a-z_]+$"
+                },
+                "password": {
+                    "description": "User's password",
+                    "type": "string"
+                },
+                "schema": {
+                    "description": "Targeted schema",
+                    "type": "string",
+                    "pattern": "^[a-z_]+$"
+                },
+                "tables": {
+                    "description": "Targeted tables",
+                    "type": "object",
+                    "properties": {
+                        "detections": {
+                            "description": "Detected farms table",
+                            "type": "string",
+                            "pattern": "^[a-z_]+$"
+                        },
+                        "declarations": {
+                            "description": "Declared farms table",
+                            "type": "string",
+                            "pattern": "^[a-z_]+$"
+                        },
+                        "links": {
+                            "description": "Link table between detected and declared farms",
+                            "type": "string",
+                            "pattern": "^[a-z_]+$"
+                        }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                        "detections",
+                        "declarations",
+                        "links"
+                    ]
+                }
+            },
+            "additionalProperties": false,
+            "required": [
+                "host",
+                "port",
+                "name",
+                "user",
+                "password",
+                "schema",
+                "tables"
+            ]
+        }
+    }
+}
