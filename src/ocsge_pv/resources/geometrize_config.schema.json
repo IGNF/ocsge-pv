@@ -1,0 +1,127 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "geometrize_config",
+    "title": "Geometrization configuration",
+    "description": "The configuration for the geometrization program",
+    "type": "object",
+    "properties": {
+        "main_database": {
+            "description": "Connection details: access to a database table describing declared photovoltaic installations",
+            "type": "object",
+            "properties": {
+                "host": {
+                    "description": "Database hostname",
+                    "type": "string",
+                    "oneOf": [
+                        {
+                            "format": "hostname"
+                        },
+                        {
+                            "format": "ipv4"
+                        },
+                        {
+                            "format": "ipv6"
+                        }
+                    ]
+                },
+                "port": {
+                    "description": "Database host's port",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "Database's name on the host server",
+                    "type": "string",
+                    "pattern": "^[a-z_]+$"
+                },
+                "user": {
+                    "description": "User's name",
+                    "type": "string",
+                    "pattern": "^[a-z_]+$"
+                },
+                "password": {
+                    "description": "User's password",
+                    "type": "string"
+                },
+                "schema": {
+                    "description": "Name of the schema",
+                    "type": "string",
+                    "pattern": "^[a-z_]+$"
+                },
+                "table": {
+                    "description": "Name of the table",
+                    "type": "string",
+                    "pattern": "^[a-z_]+$"
+                }
+            },
+            "additionalProperties": false,
+            "required": [
+                "host",
+                "port",
+                "name",
+                "user",
+                "password",
+                "schema",
+                "table"
+            ]
+        },
+        "cadastre_database": {
+            "description": "Connection details: access to a database table describing cadastral parcels",
+            "type": "object",
+            "properties": {
+                "host": {
+                    "description": "Database hostname",
+                    "type": "string",
+                    "oneOf": [
+                        {
+                            "format": "hostname"
+                        },
+                        {
+                            "format": "ipv4"
+                        },
+                        {
+                            "format": "ipv6"
+                        }
+                    ]
+                },
+                "port": {
+                    "description": "Database host's port",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "Database's name on the host server",
+                    "type": "string",
+                    "pattern": "^[a-z_]+$"
+                },
+                "user": {
+                    "description": "User's name",
+                    "type": "string",
+                    "pattern": "^[a-z_]+$"
+                },
+                "password": {
+                    "description": "User's password",
+                    "type": "string"
+                },
+                "schema": {
+                    "description": "Name of the schema",
+                    "type": "string",
+                    "pattern": "^[a-z_]+$"
+                },
+                "table": {
+                    "description": "Name of the table",
+                    "type": "string",
+                    "pattern": "^[a-z_]+$"
+                }
+            },
+            "additionalProperties": false,
+            "required": [
+                "host",
+                "port",
+                "name",
+                "user",
+                "password",
+                "schema",
+                "table"
+            ]
+        }
+    }
+}

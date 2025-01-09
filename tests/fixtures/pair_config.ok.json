@@ -1,0 +1,15 @@
+{
+    "main_database": {
+        "host": "192.168.0.1",
+        "port": 5432,
+        "name": "ocsge",
+        "user": "data_producer",
+        "password": "bip-boop-123456",
+        "schema": "photovoltaic",
+        "tables": {
+            "detections": "detection",
+            "declararations": "declaration",
+            "links": "declaration_detection"
+        }
+    }
+}
