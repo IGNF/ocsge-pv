@@ -29,7 +29,8 @@ classifiers = [
 
 dependencies = [
   "GDAL >= 3.6.2",
-  "psycopg"
+  "psycopg",
+  "jsonschema >= 4.23.0"
 ]
 
 [project.optional-dependencies]
@@ -48,9 +49,9 @@ test = [
 ]
 
 [project.urls]
-"Homepage" = ""
+"Homepage" = "https://github.com/IGNF/ocsge-pv"
 "Bug Reports" = "https://github.com/IGNF/ocsge-pv/issues"
-"Changelog" = ""
+"Changelog" = "https://github.com/IGNF/ocsge-pv/releases"
 "Source" = "https://github.com/IGNF/ocsge-pv"
 
 [project.scripts]

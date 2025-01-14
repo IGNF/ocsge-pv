@@ -5,19 +5,20 @@ RUN ln -fs "/usr/share/zoneinfo/${TZ}" \
 && DEBIAN_FRONTEND=noninteractive apt install -y tzdata \
 && dpkg-reconfigure --frontend noninteractive tzdata \
 && apt install -y python3 python3-gdal python3-pip
-RUN python3 -m pip install --upgrade pip
 WORKDIR /home/ubuntu
+RUN chown -R ubuntu:ubuntu /home/ubuntu
 
 FROM base AS build_stage
-COPY . /home/ubuntu/app
-RUN python3 -m pip install --upgrade setuptools build
 WORKDIR /home/ubuntu/app
+COPY . /home/ubuntu/app
+RUN apt install -y python3-setuptools python3-build python3-venv \
+&& chown -R ubuntu:ubuntu /home/ubuntu
 USER ubuntu
 RUN python3 -m build
 
 FROM base AS install_stage
-COPY --from=build_stage /home/ubuntu/app/dist/*.whl /tmp/app.whl
 USER ubuntu
+COPY --from=build_stage /home/ubuntu/app/dist/*.whl /tmp/app.whl
 RUN python3 -m pip install --user /tmp/app.whl
 
 CMD ["bash"]

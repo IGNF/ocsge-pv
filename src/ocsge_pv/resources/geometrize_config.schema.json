@@ -122,6 +122,16 @@
                 "schema",
                 "table"
             ]
+        },
+        "procedure_number": {
+            "description": "Identifier for the procedure on the https://www.demarches-simplifiees.fr/ platform.",
+            "type": "integer"
         }
-    }
+    },
+    "additionalProperties": false,
+    "required": [
+        "main_database",
+        "cadastre_database",
+        "procedure_number"
+    ]
 }
