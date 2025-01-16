@@ -5,7 +5,7 @@ version = "0.0.0"
 
 description = "Python tools for generation of the photovoltaic data used in OCSGE from IGN France"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 license = {file = "LICENSE.md"}
 
 keywords = ["aggregation", "OCSGE", "photovoltaic"]
@@ -20,9 +20,11 @@ classifiers = [
 
   "Topic :: Software Development",
 
-  "License :: Choice pending",
+  "License :: MIT",
 
   "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3 :: Only",
 ]
@@ -59,17 +61,17 @@ geometrize_declarations = "ocsge_pv.geometrize_declarations:main"
 pair_from_sources = "ocsge_pv.pair_from_sources:main"
 
 [build-system]
-requires = ["setuptools>=61.0.0", "wheel"]
+requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.black]
 line-length = 100
-target-version = ["py312"]
+target-version = ["py310", "py311", "py312"]
 
 [tool.ruff]
 line-length = 100
 src = ["src"]
-target-version = "py312"
+target-version = "py310"
 
 # Allow autofix for all enabled rules (when `--fix`) is provided.
 fixable = ["ALL"]

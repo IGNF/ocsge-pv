@@ -1,24 +1,29 @@
-FROM ubuntu:24.04 AS base
+FROM ubuntu:24.04 AS common
 ARG TZ="Europe/Paris"
 RUN ln -fs "/usr/share/zoneinfo/${TZ}" \
 && apt update \
-&& DEBIAN_FRONTEND=noninteractive apt install -y tzdata \
+&& apt -y upgrade \
+&& DEBIAN_FRONTEND=noninteractive apt -y install tzdata \
 && dpkg-reconfigure --frontend noninteractive tzdata \
-&& apt install -y python3 python3-gdal python3-pip
-WORKDIR /home/ubuntu
-RUN chown -R ubuntu:ubuntu /home/ubuntu
+&& apt -y install python3 python3-gdal \
+&& sudo apt -y autoremove --purge \
+&& apt -y clean
+COPY . /app
+WORKDIR /app
 
-FROM base AS build_stage
-WORKDIR /home/ubuntu/app
-COPY . /home/ubuntu/app
-RUN apt install -y python3-setuptools python3-build python3-venv \
-&& chown -R ubuntu:ubuntu /home/ubuntu
-USER ubuntu
-RUN python3 -m build
+FROM common AS build_environment
+RUN apt update \
+&& apt -y install python3-venv python3-setuptools python3-wheel
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+RUN source /opt/venv/bin/activate \
+&& python3 -m build \
+&& python3 -m pip install ./dist/*.whl
 
-FROM base AS install_stage
+FROM common AS run_environment
+COPY --from=build_environment /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 USER ubuntu
-COPY --from=build_stage /home/ubuntu/app/dist/*.whl /tmp/app.whl
-RUN python3 -m pip install --user /tmp/app.whl
+ENV PATH="/opt/venv/bin:$PATH"
 
 CMD ["bash"]
