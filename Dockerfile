@@ -6,17 +6,17 @@ RUN ln -fs "/usr/share/zoneinfo/${TZ}" \
 && DEBIAN_FRONTEND=noninteractive apt -y install tzdata \
 && dpkg-reconfigure --frontend noninteractive tzdata \
 && apt -y install python3 python3-gdal \
-&& sudo apt -y autoremove --purge \
+&& apt -y autoremove --purge \
 && apt -y clean
 COPY . /app
 WORKDIR /app
 
 FROM common AS build_environment
 RUN apt update \
-&& apt -y install python3-venv python3-setuptools python3-wheel
+&& apt -y install python3-venv
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
-RUN source /opt/venv/bin/activate \
+RUN python3 -m pip install setuptools wheel build \
 && python3 -m build \
 && python3 -m pip install ./dist/*.whl
 
