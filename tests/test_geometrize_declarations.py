@@ -6,16 +6,20 @@ Each variable prefixed by "m_" is a mock, or part of it.
 Each variable prefixed by "f_" is a fixture.
 """
 
+import json
 from unittest import TestCase, mock
-from unittest.mock import MagicMock, call, mock_open
+from unittest.mock import MagicMock, call, mock_open, patch
 
+from jsonschema import validate, ValidationError
 import pytest
 import psycopg
 
-import ocsge_pv.geometrize_declarations as TM # tested module
+from ocsge_pv.geometrize_declarations import (
+    load_configuration
+)
 
 # TODO Features to test :
-# * read configuration
+# * ~~read configuration~~
 # * connect to database
 # * read photovoltaic input table
 # * check if geometry is initialised
@@ -25,42 +29,65 @@ import ocsge_pv.geometrize_declarations as TM # tested module
 # * compute geometry
 # * write in photovoltaic output table (same one as input)
 
-# Fixtures
-## Configuration file path
-f_config_path = "/tmp/conf/geometrize.json"
-## Configuration file, nominal
-f_config_ok_raw = ""
-with open("./fixtures/geometrize_config_ok.json", "r", encoding="utf-8") as file:
-    f_config_ok_raw = file.read()
-## Configuration object, nominal
-f_config_ok_obj = {
-    "main_database": {
-        "host": "192.168.0.1",
-        "port": 5432,
-        "name": "ocsge",
-        "user": "data_producer",
-        "password": "bip-boop-123456",
-        "schema": "photovoltaic",
-        "table": "declaration"
-    },
-    "cadastre_database": {
-        "host": "localhost",
-        "port": 5433,
-        "name": "cadastre",
-        "user": "land_surveyor",
-        "password": "1arpent",
-        "schema": "cadastre_data",
-        "table": "parcels"
-    },
-    "procedure_number": 98746
-}
 
 #Tests
-@mock.patch(jsonschema.validate)
-@patch("builtins.open", new_callable=mock_open, read_data=f_config_ok)
-def test_load_configuration_ok(m_file, m_validator):
-    result = TM.load_configuration(f_config_path)
-    m_file.assert_called_with(config_path, "r")
-    m_validator.assert_called_with(config_path, schema_path)
-    assert result == f_config_ok_obj
+class TestConfigurationLoader(TestCase):
+    def setUp(self):
+        # Fixtures
+        ## Configuration file path
+        self.f_config_ok_path = "tests/fixtures/geometrize_config.ok.json"
+        self.f_config_nok_path = "tests/fixtures/geometrize_config.nok.json"
+        ## Configuration file, nominal
+        self.f_config_ok_raw = ""
+        with open(self.f_config_ok_path, "r", encoding="utf-8") as file:
+            self.f_config_ok_raw = file.read()
+        ## Configuration object, nominal
+        self.f_config_ok_obj = json.loads(self.f_config_ok_raw)
+        ## Configuration file, invalid
+        self.f_config_nok_raw = ""
+        with open(self.f_config_nok_path, "r", encoding="utf-8") as file:
+            self.f_config_nok_raw = file.read()
+        ## Configuration object, invalid
+        self.f_config_nok_obj = json.loads(self.f_config_nok_raw)
+
+        ## Configuration file path
+        self.f_config_schema_path = "src/ocsge_pv/resources/geometrize_config.schema.json"
+        ## Configuration file, nominal
+        self.f_config_schema_raw = ""
+        with open(self.f_config_schema_path, "r", encoding="utf-8") as file:
+            self.f_config_schema_raw = file.read()
+        ## Configuration object, nominal
+        self.f_config_schema_obj = json.loads(self.f_config_schema_raw)
+
+    @patch("jsonschema.validate", side_effect=validate)
+    @patch("builtins.open")
+    def test_load_configuration_ok(self, m_open, m_validator):
+        m_open.side_effect = [
+            mock_open(read_data=self.f_config_ok_raw).return_value,
+            mock_open(read_data=self.f_config_schema_raw).return_value
+        ]
+        result = load_configuration(self.f_config_ok_path)
+        m_open.assert_called()
+        m_open.assert_has_calls([
+            call(self.f_config_ok_path, "r", encoding="utf-8"),
+            call(self.f_config_schema_path, "r", encoding="utf-8")
+        ])
+        m_validator.assert_called_with(self.f_config_ok_obj, schema=self.f_config_schema_obj)
+        assert result == self.f_config_ok_obj
+
+    @patch("jsonschema.validate", side_effect=validate)
+    @patch("builtins.open")
+    def test_load_configuration_ok(self, m_open, m_validator):
+        m_open.side_effect = [
+            mock_open(read_data=self.f_config_nok_raw).return_value,
+            mock_open(read_data=self.f_config_schema_raw).return_value
+        ]
+        with self.assertRaises(ValidationError):
+            result = load_configuration(self.f_config_nok_path)
+        m_open.assert_called()
+        m_open.assert_has_calls([
+            call(self.f_config_nok_path, "r", encoding="utf-8"),
+            call(self.f_config_schema_path, "r", encoding="utf-8")
+        ])
+        m_validator.assert_called_with(self.f_config_nok_obj, schema=self.f_config_schema_obj)
 

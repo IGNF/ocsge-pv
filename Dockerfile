@@ -10,35 +10,28 @@ RUN ln -fs "/usr/share/zoneinfo/${TZ}" \
 && apt -y clean
 COPY . /app
 WORKDIR /app
-
-# FROM common AS test_environment
-# RUN apt update \
-# && apt -y install python3-venv python3-pip
-# RUN python3 -m venv /opt/venv
-# ENV PATH="/opt/venv/bin:$PATH"
-# RUN python3 -m pip install "gdal==$(gdal-config --version)" .[test] \
-# && python3 -m pytest ./tests
+RUN chown -R ubuntu /app
 
 FROM common AS build_environment
 RUN apt update \
 && apt -y install python3-venv python3-pip
-RUN python3 -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
+USER ubuntu
+RUN python3 -m venv /app/venv
+ENV PATH="/app/venv/bin:$PATH"
 RUN python3 -m pip install setuptools wheel build "gdal==$(gdal-config --version)" \
 && python3 -m build
 
 FROM common AS install_environment
-COPY --from=build_environment /app/dist/*.whl /app/dist/
 RUN apt update \
 && apt -y install python3-venv python3-pip
-RUN python3 -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
+USER ubuntu
+COPY --from=build_environment /app/dist/*.whl /app/dist/
+RUN python3 -m venv /app/venv
+ENV PATH="/app/venv/bin:$PATH"
 RUN python3 -m pip install "gdal==$(gdal-config --version)" ./dist/*.whl
 
 FROM common AS run_environment
-COPY --from=install_environment /opt/venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-USER ubuntu
-ENV PATH="/opt/venv/bin:$PATH"
+COPY --from=install_environment /app/venv /app/venv
+ENV PATH="/app/venv/bin:$PATH"
 
 CMD ["bash"]

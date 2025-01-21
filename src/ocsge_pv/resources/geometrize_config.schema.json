@@ -12,7 +12,7 @@
                 "host": {
                     "description": "Database hostname",
                     "type": "string",
-                    "oneOf": [
+                    "anyOf": [
                         {
                             "format": "hostname"
                         },
@@ -71,7 +71,7 @@
                 "host": {
                     "description": "Database hostname",
                     "type": "string",
-                    "oneOf": [
+                    "anyOf": [
                         {
                             "format": "hostname"
                         },
