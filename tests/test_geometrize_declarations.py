@@ -31,6 +31,27 @@ from ocsge_pv.geometrize_declarations import (
 
 
 #Tests
+class TestConfigurationValidationSchema(TestCase):
+    def setUp(self):
+        self.schema_path = "src/ocsge_pv/resources/geometrize_config.schema.json"
+        self.f_config_ok_path = "tests/fixtures/geometrize_config.ok.json"
+        self.f_config_nok_path = "tests/fixtures/geometrize_config.nok.json"
+        with open(self.schema_path, "r", encoding="utf-8") as fp:
+            self.schema = json.load(fp)
+
+    def test_with_valid_config(self):
+        with open(self.f_config_ok_path, "r", encoding="utf-8") as fp:
+            f_config_obj = json.load(fp)
+        result = validate(f_config_obj, self.schema)
+        self.assertIsNone(result)
+
+    def test_with_invalid_config(self):
+        with open(self.f_config_nok_path, "r", encoding="utf-8") as fp:
+            f_config_obj = json.load(fp)
+        with self.assertRaises(ValidationError):
+            validate(f_config_obj, self.schema)
+
+
 class TestConfigurationLoader(TestCase):
     def setUp(self):
         # Fixtures
@@ -59,7 +80,7 @@ class TestConfigurationLoader(TestCase):
         ## Configuration object, nominal
         self.f_config_schema_obj = json.loads(self.f_config_schema_raw)
 
-    @patch("jsonschema.validate", side_effect=validate)
+    @patch("jsonschema.validate")
     @patch("builtins.open")
     def test_load_configuration_ok(self, m_open, m_validator):
         m_open.side_effect = [
@@ -72,10 +93,10 @@ class TestConfigurationLoader(TestCase):
             call(self.f_config_ok_path, "r", encoding="utf-8"),
             call(self.f_config_schema_path, "r", encoding="utf-8")
         ])
-        m_validator.assert_called_with(self.f_config_ok_obj, schema=self.f_config_schema_obj)
+        m_validator.assert_called_with(self.f_config_ok_obj, self.f_config_schema_obj)
         assert result == self.f_config_ok_obj
 
-    @patch("jsonschema.validate", side_effect=validate)
+    @patch("jsonschema.validate", side_effect=ValidationError("Invalid configuration."))
     @patch("builtins.open")
     def test_load_configuration_ok(self, m_open, m_validator):
         m_open.side_effect = [
@@ -89,5 +110,5 @@ class TestConfigurationLoader(TestCase):
             call(self.f_config_nok_path, "r", encoding="utf-8"),
             call(self.f_config_schema_path, "r", encoding="utf-8")
         ])
-        m_validator.assert_called_with(self.f_config_nok_obj, schema=self.f_config_schema_obj)
+        m_validator.assert_called_with(self.f_config_nok_obj, self.f_config_schema_obj)
 

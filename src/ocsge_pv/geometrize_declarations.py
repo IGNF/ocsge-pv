@@ -43,7 +43,7 @@ def load_configuration(path: str) -> object:
     with open(validation_schema_path, "r", encoding="utf-8") as schema_file:
         schema_str = schema_file.read()
     schema = json.loads(schema_str)
-    jsonschema.validate(configuration, schema=schema)
+    jsonschema.validate(configuration, schema)
     return configuration
 
 # -- MAIN SCRIPT --
