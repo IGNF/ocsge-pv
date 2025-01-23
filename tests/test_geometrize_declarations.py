@@ -8,13 +8,13 @@ Each variable prefixed by "f_" is a fixture.
 
 import json
 from unittest import TestCase, mock
-from unittest.mock import MagicMock, call, mock_open, patch
+from unittest.mock import Mock, call, mock_open, patch
 
 from jsonschema import validate, ValidationError
 import pytest
-import psycopg
 
 from ocsge_pv.geometrize_declarations import (
+    execute_request,
     load_configuration
 )
 
@@ -111,4 +111,34 @@ class TestConfigurationLoader(TestCase):
             call(self.f_config_schema_path, "r", encoding="utf-8")
         ])
         m_validator.assert_called_with(self.f_config_nok_obj, self.f_config_schema_obj)
+
+class TestExecuteRequest(TestCase):
+    def setUp(self):
+        with open(self.f_config_ok_path, "r", encoding="utf-8") as fp:
+            self.configuration = json.load(fp)
+            self.m_execute = Mock()
+            self.m_cursor = Mock(name="psycopg.Cursor", spec=["execute"])
+            self.m_cursor.execute = m_execute
+            self.m_connection = Mock(name="psycopg.Connection", spec=["cursor"])
+            self.m_connection.cursor = Mock(return_value=m_cursor)
+
+    @patch("psycopg.connect")
+    def execute_request(self, m_psycopg_connect):
+        m_psycopg_connect.return_value = self.m_connection
+        expected = [
+            (11569, "940670000D0013;940670000D0014;940670000D0015;940670000D0016;940670000D0017;940670000D0018"),
+            (12684, "940670000D0050")    
+        ]
+        self.m_execute.return_value = expected
+        request = ("SELECT id_dossier, num_parcelles"
+            +"FROM parcs_photovoltaiques.declaration"
+            +"WHERE geom IS NULL;")
+        result = execute_request(self.configuration, request)
+        self.assertIsNotNone(result)
+        self.assertEqual(expected, result)
+        m_psycopg_connect.assert_called_once()
+        self.m_cursor.assert_called_once()
+        self.m_execute.assert_called_once()
+
+
 
