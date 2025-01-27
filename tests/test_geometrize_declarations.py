@@ -7,31 +7,22 @@ Each variable prefixed by "f_" is a fixture.
 """
 
 import json
-from unittest import TestCase, mock
-from unittest.mock import Mock, call, mock_open, patch
+from unittest import TestCase, mock, skip
+from unittest.mock import Mock, MagicMock, call, mock_open, patch
 
 from jsonschema import validate, ValidationError
 import pytest
 
 from ocsge_pv.geometrize_declarations import (
-    execute_request,
-    load_configuration
+    load_configuration,
+    main
 )
 
-# TODO Features to test :
-# * ~~read configuration~~
-# * connect to database
-# * read photovoltaic input table
-# * check if geometry is initialised
-# * read cadastral input table
-# * convert between spatial reference systems with axis permutation
-# * convert between spatial reference systems without axis permutation
-# * compute geometry
-# * write in photovoltaic output table (same one as input)
 
 
 #Tests
 class TestConfigurationValidationSchema(TestCase):
+    """Tests the configuration validation schema itself."""
     def setUp(self):
         self.schema_path = "src/ocsge_pv/resources/geometrize_config.schema.json"
         self.f_config_ok_path = "tests/fixtures/geometrize_config.ok.json"
@@ -53,6 +44,7 @@ class TestConfigurationValidationSchema(TestCase):
 
 
 class TestConfigurationLoader(TestCase):
+    """Tests the configuration loader."""
     def setUp(self):
         # Fixtures
         ## Configuration file path
@@ -112,33 +104,45 @@ class TestConfigurationLoader(TestCase):
         ])
         m_validator.assert_called_with(self.f_config_nok_obj, self.f_config_schema_obj)
 
-class TestExecuteRequest(TestCase):
+# TODO Features to test :
+# * ~~read configuration~~
+# * connect to database
+# * read photovoltaic input table
+# * check if geometry is initialised
+# * read cadastral input table
+# * convert between spatial reference systems with axis permutation
+# * convert between spatial reference systems without axis permutation
+# * compute geometry
+# * write in photovoltaic output table (same one as input)
+
+class TestMain(TestCase):
+    """Tests the main routine, entrypoint for the executable."""
     def setUp(self):
-        with open(self.f_config_ok_path, "r", encoding="utf-8") as fp:
-            self.configuration = json.load(fp)
-            self.m_execute = Mock()
-            self.m_cursor = Mock(name="psycopg.Cursor", spec=["execute"])
-            self.m_cursor.execute = m_execute
-            self.m_connection = Mock(name="psycopg.Connection", spec=["cursor"])
-            self.m_connection.cursor = Mock(return_value=m_cursor)
+        self.m_execute = MagicMock()
+        self.m_cursor = MagicMock(name="psycopg.Cursor")
+        self.m_cursor.__enter__.return_value.execute = self.m_execute
 
     @patch("psycopg.connect")
-    def execute_request(self, m_psycopg_connect):
-        m_psycopg_connect.return_value = self.m_connection
-        expected = [
-            (11569, "940670000D0013;940670000D0014;940670000D0015;940670000D0016;940670000D0017;940670000D0018"),
-            (12684, "940670000D0050")    
-        ]
-        self.m_execute.return_value = expected
-        request = ("SELECT id_dossier, num_parcelles"
-            +"FROM parcs_photovoltaiques.declaration"
-            +"WHERE geom IS NULL;")
-        result = execute_request(self.configuration, request)
-        self.assertIsNotNone(result)
-        self.assertEqual(expected, result)
-        m_psycopg_connect.assert_called_once()
-        self.m_cursor.assert_called_once()
-        self.m_execute.assert_called_once()
+    @patch("ocsge_pv.geometrize_declarations.load_configuration")
+    def test_ok(self, m_loader, m_psycopg_connect):
+        m_psycopg_connect.return_value.__enter__.return_value.cursor = self.m_cursor
+        f_config_path = "tests/fixtures/geometrize_config.ok.json"
+        with open(f_config_path, "r", encoding="utf-8") as fp:
+            f_configuration = json.load(fp)
+        m_loader.return_value = f_configuration
+        main(f_config_path)
+        m_loader.assert_called_once_with(f_config_path)
+        main_db_connection_string=("host=" + f_configuration['main_database']['host']
+            + " port=" + str(f_configuration['main_database']['port'])
+            + " dbname=" + f_configuration['main_database']['name']
+            + " user=" + f_configuration['main_database']['user']
+            + " password=" + f_configuration['main_database']['password'])
+        m_psycopg_connect.assert_has_calls([
+            call(main_db_connection_string)
+        ])
+        self.m_cursor.assert_called()
+
+
 
 
 
