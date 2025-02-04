@@ -47,12 +47,14 @@ def load_configuration(path: str) -> Dict:
     jsonschema.validate(source_configuration, schema)
     modified_configuration = deepcopy(source_configuration)
     # Declarations data (input + output)
-    modified_configuration["main_database"]["_pg_string"] = ("host=" + modified_configuration['main_database']['host']
+    modified_configuration["main_database"]["_pg_string"] = (
+        "host=" + modified_configuration['main_database']['host']
         + " port=" + str(modified_configuration['main_database']['port'])
         + " dbname=" + modified_configuration['main_database']['name']
         + " user=" + modified_configuration['main_database']['user']
         + " password=" + modified_configuration['main_database']['password'])
-    modified_configuration["main_database"]["_pg_string"] = ("host=" + modified_configuration['main_database']['host']
+    modified_configuration["main_database"]["_pg_string"] = (
+        "host=" + modified_configuration['main_database']['host']
         + " port=" + str(modified_configuration['main_database']['port'])
         + " dbname=" + modified_configuration['main_database']['name']
         + " user=" + modified_configuration['main_database']['user']
@@ -105,18 +107,65 @@ def main(configuration_file_path: str) -> None:
     ogr_ct = None
     coordinates_need_swap = False
     latlon_sr_name_list = ['WGS 84']
-    if (cadastre_ogr_srs != declaration_ogr_srs):
+    if cadastre_ogr_srs != declaration_ogr_srs:
         ogr_ct = osr.CreateCoordinateTransformation(cadastre_ogr_srs, declaration_ogr_srs)
-        is_cadastre_srs_latlon = (cadastre_ogr_srs.EPSGTreatsAsLatLong() or cadastre_ogr_srs.GetName() in latlon_sr_name_list)
-        is_declaration_srs_latlon = (declaration_ogr_srs.EPSGTreatsAsLatLong() or declaration_ogr_srs.GetName() in latlon_sr_name_list)
+        is_cadastre_srs_latlon = (cadastre_ogr_srs.EPSGTreatsAsLatLong() 
+            or cadastre_ogr_srs.GetName() in latlon_sr_name_list)
+        is_declaration_srs_latlon = (declaration_ogr_srs.EPSGTreatsAsLatLong() 
+            or declaration_ogr_srs.GetName() in latlon_sr_name_list)
         coordinates_need_swap = (
             (is_cadastre_srs_latlon and not is_declaration_srs_latlon)
             or (is_declaration_srs_latlon and not is_cadastre_srs_latlon)
         )
+    # Georeference declarations
+    declaration_updates_list = []
+    for declaration_feature in declaration_ogr_layer:
+        try:
+            parcel_uid_list = declaration_feature.GetField("num_parcelles").split(";")
+        except:
+            parcel_uid_list = None
+        farm_fid = declaration_feature.GetFID()
+        farm_geom = declaration_feature.geometry()
+        if farm_geom is None and parcel_uid_list is not None:
+            new_geom = None
+            temp_geom = None
+            for parcel_uid in parcel_uid_list:
+                cadastre_ogr_layer.SetAttributeFilter(f"idu = '{parcel_uid}'")
+                if cadastre_ogr_layer.GetFeatureCount() < 1:
+                    raise ValueError(f"Cadastral parcel '{parcel_uid}' was not found.")
+                for parcel_feature in cadastre_ogr_layer:
+                    parcel_geom = parcel_feature.geometry().Clone()
+                    if cadastre_ogr_srs != declaration_ogr_srs:
+                        if coordinates_need_swap:
+                            parcel_geom.SwapXY()
+                        parcel_geom.Transform(ogr_ct)
+                    if new_geom is None:
+                        new_geom = parcel_geom
+                    else:
+                        temp_geom = new_geom.Union(parcel_geom)
+                        new_geom = temp_geom
+            declaration_updates_list.append((farm_fid, new_geom.ExportToWkt()))
     # Write output
+    declaration_pkey = declaration_ogr_layer.GetFIDColumn()
     with psycopg.connect(configuration["main_database"]["_pg_string"]) as conn:
         with conn.cursor() as cur:
-            print()
+            cur.execute("BEGIN")
+            for entry in declaration_updates_list:
+                # Vérification d'existence du lien
+                cur.execute(
+                    sql.SQL(
+                        "UPDATE {table} SET {geom_key} = ST_GeomFromText(%s) WHERE {id_key} = %s"
+                    ).format(
+                        geom_key=sql.Identifier("geom"),
+                        id_key=sql.Identifier(declaration_pkey),
+                        table=configuration["main_database"]["_table_name_sql"]
+                    ),
+                    (
+                        entry[1],
+                        entry[0],
+                    )
+                )
+            cur.execute("COMMIT")
 
 
 # -- MAIN SCRIPT --

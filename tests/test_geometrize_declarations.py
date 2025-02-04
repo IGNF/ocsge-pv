@@ -7,6 +7,7 @@ Each variable prefixed by "f_" is a fixture.
 """
 from copy import deepcopy
 import json
+import re
 from unittest import TestCase, mock, skip
 from unittest.mock import MagicMock, call, mock_open, patch
 
@@ -60,8 +61,13 @@ class TestConfigurationLoader(TestCase):
         self.f_config_ok_raw = ""
         with open(self.f_config_ok_path, "r", encoding="utf-8") as file:
             self.f_config_ok_raw = file.read()
-        ## Configuration object, nominal
+        ## Configuration object, nominal before validation
         self.f_config_ok_obj = json.loads(self.f_config_ok_raw)
+        ## Configuration object, nominal after complete load
+        f_config_loaded_path = "tests/fixtures/geometrize_config.loaded.json"
+        with open(f_config_loaded_path, "r", encoding="utf-8") as file:
+            f_config_loaded_raw = file.read()
+        self.f_config_loaded_obj = json.loads(f_config_loaded_raw)
         ## Configuration file, invalid
         self.f_config_nok_raw = ""
         with open(self.f_config_nok_path, "r", encoding="utf-8") as file:
@@ -86,28 +92,10 @@ class TestConfigurationLoader(TestCase):
             mock_open(read_data=self.f_config_ok_raw).return_value,
             mock_open(read_data=self.f_config_schema_raw).return_value
         ]
-        expected_result = deepcopy(self.f_config_ok_obj)
-        expected_result["main_database"]["_pg_string"] = (
-            "host=" + expected_result["main_database"]["host"]
-            + " port=" + str(expected_result["main_database"]["port"])
-            + " dbname=" + expected_result["main_database"]["name"]
-            + " user=" + expected_result["main_database"]["user"]
-            + " password=" + expected_result["main_database"]["password"])
-        expected_result["main_database"]["_table_name_raw"] = (
-            expected_result["main_database"]["schema"] + "."
-            + expected_result["main_database"]["table"])
+        expected_result = deepcopy(self.f_config_loaded_obj)
         expected_result["main_database"]["_table_name_sql"] = sql.SQL(".").join([
             expected_result["main_database"]["schema"],
             expected_result["main_database"]["table"]])
-        expected_result["cadastre_database"]["_pg_string"] = (
-            "host=" + expected_result["cadastre_database"]["host"]
-            + " port=" + str(expected_result["cadastre_database"]["port"])
-            + " dbname=" + expected_result["cadastre_database"]["name"]
-            + " user=" + expected_result["cadastre_database"]["user"]
-            + " password=" + expected_result["cadastre_database"]["password"])
-        expected_result["cadastre_database"]["_table_name_raw"] = (
-            expected_result["cadastre_database"]["schema"] + "."
-            + expected_result["cadastre_database"]["table"])
         # Call to the tested function
         result = load_configuration(self.f_config_ok_path)
         # Assertions
@@ -138,6 +126,51 @@ class TestConfigurationLoader(TestCase):
         ])
         m_validator.assert_called_with(self.f_config_nok_obj, self.f_config_schema_obj)
 
+class TestWriter(TestCase):
+    """Tests the output writing routine."""
+    def setUp(self):
+        f_config_loaded_path = "tests/fixtures/geometrize_config.loaded.json"
+        with open(f_config_loaded_path, "r", encoding="utf-8") as file:
+            f_config_loaded_raw = file.read()
+        self.f_configuration = json.loads(f_config_loaded_raw)
+        self.m_execute = MagicMock()
+        self.m_cursor = MagicMock()
+        self.m_cursor.return_value.__enter__.return_value.execute = self.m_execute
+        self.update_list = {}
+
+    @patch("psycopg.connect")
+    def test_ok(self, m_psycopg_connect):
+        # Preparation
+        f_config_loaded_path = "tests/fixtures/geometrize_config.loaded.json"
+        with open(f_config_loaded_path, "r", encoding="utf-8") as file:
+            f_config_loaded_raw = file.read()
+        f_configuration = json.loads(f_config_loaded_raw)
+        m_execute = MagicMock()
+        m_cursor = MagicMock()
+        m_cursor.return_value.__enter__.return_value.execute = m_execute
+        update_list = [
+            (126, "POLYGON(110 185, 115 185, 115 190, 110 190, 110 185)"),
+            (453, "POLYGON(120 185, 125 185, 125 190, 120 190, 120 185)"),
+            (1984, "POLYGON(130 195, 135 195, 135 190, 130 190, 130 195)"),
+        ]
+        m_psycopg_connect.return_value.__enter__.return_value.cursor = m_cursor
+        # Call to the tested function
+        write_output(f_configuration, update_list)
+        # Assertions
+        m_psycopg_connect.assert_has_calls([
+            call(f_configuration["main_database"]["_pg_string"])
+        ])
+        m_cursor.assert_called_once_with()
+        m_execute.assert_called()
+        self.assertIn(call("BEGIN"), m_execute.call_args_list)
+        self.assertIn(call("COMMIT"), m_execute.call_args_list)
+        sql_update_count = 0
+        for call_entry in m_execute.call_args_list:
+            if re.match("UPDATE", call_entry[0][0]):
+                sql_update_count += 1
+        self.assertGreater(sql_update_count, 0)
+
+
 # TODO Features to test :
 # * ~~read configuration~~
 # * connect to database
@@ -152,15 +185,15 @@ class TestConfigurationLoader(TestCase):
 class TestMain(TestCase):
     """Tests the main routine, entrypoint for the executable."""
     def setUp(self):
-        self.m_execute = MagicMock()
-        self.m_cursor = MagicMock()
-        self.m_cursor.__enter__.return_value.execute = self.m_execute
+        f_config_loaded_path = "tests/fixtures/geometrize_config.loaded.json"
+        with open(f_config_loaded_path, "r", encoding="utf-8") as file:
+            f_config_loaded_raw = file.read()
+        self.f_configuration = json.loads(f_config_loaded_raw)
 
     @patch("osgeo.osr.CreateCoordinateTransformation")
     @patch("osgeo.ogr.Open")
-    @patch("psycopg.connect")
     @patch("ocsge_pv.geometrize_declarations.load_configuration")
-    def test_ok(self, m_loader, m_psycopg_connect, m_ogr_open, m_osr_createct):
+    def test_ok(self, m_loader, m_ogr_open, m_osr_createct):
         # Preparation
         ## OGR/OSR entities 
         m_main_ogr_ds = MagicMock()
@@ -178,31 +211,8 @@ class TestMain(TestCase):
         m_parcel_ogr_sr.GetName.return_value = "WGS 84"
         m_parcel_ogr_sr.EPSGTreatsAsLatLong.return_value = None
         m_ogr_open.side_effect=[m_main_ogr_ds, m_parcel_ogr_ds]
-        m_psycopg_connect.return_value.__enter__.return_value.cursor = self.m_cursor
         ## Configuration object
-        f_config_path = "tests/fixtures/geometrize_config.ok.json"
-        with open(f_config_path, "r", encoding="utf-8") as fp:
-            f_configuration = json.load(fp)
-        f_configuration["main_database"]["_pg_string"] = (
-            "host=" + f_configuration["main_database"]["host"]
-            + " port=" + str(f_configuration["main_database"]["port"])
-            + " dbname=" + f_configuration["main_database"]["name"]
-            + " user=" + f_configuration["main_database"]["user"]
-            + " password=" + f_configuration["main_database"]["password"])
-        f_configuration["cadastre_database"]["_pg_string"] = (
-            "host=" + f_configuration["cadastre_database"]["host"]
-            + " port=" + str(f_configuration["cadastre_database"]["port"])
-            + " dbname=" + f_configuration["cadastre_database"]["name"]
-            + " user=" + f_configuration["cadastre_database"]["user"]
-            + " password=" + f_configuration["cadastre_database"]["password"])
-        f_configuration["main_database"]["_table_name_raw"] = (
-            f_configuration["main_database"]["schema"] + "."
-            + f_configuration["main_database"]["table"])
-        f_configuration["main_database"]["_table_name_sql"] = ("SQL("
-            + f_configuration["main_database"]["_table_name_raw"] + ")")
-        f_configuration["cadastre_database"]["_table_name_raw"] = (
-            f_configuration["cadastre_database"]["schema"] + "."
-            + f_configuration["cadastre_database"]["table"])
+        f_configuration = deepcopy(self.f_configuration)
         m_loader.return_value = f_configuration
         # Call to the tested function
         main(f_config_path)
@@ -223,13 +233,6 @@ class TestMain(TestCase):
         m_parcel_ogr_sr.GetName.assert_called_once()
         m_parcel_ogr_sr.EPSGTreatsAsLatLong.assert_called_once()
         m_osr_createct.assert_called_once_with(m_parcel_ogr_sr, m_main_ogr_sr)
-        ## Psycopg
-        m_psycopg_connect.assert_has_calls([
-            call(f_configuration["main_database"]["_pg_string"])
-        ])
-        self.m_cursor.assert_called()
-        self.m_execute.assert_called()
-        self.assertIn(call("SELECT "), self.m_execute.call_args_list)
 
 
 
