@@ -1,4 +1,17 @@
-"""Provides an executable to add geometries to declared photovoltaic installations.
+"""Photovoltaic farm declarations geometry setter
+
+Compute and add geometries to declared photovoltaic installations.
+Cadastral parcels' geometries are used to determine the complete 
+geometry of a declared installation.
+
+This script's only argument is the path to a configuration file.
+A model named 'geometrize_config.ok.json' is available in 
+the 'tests/fixture' folder.
+
+This file contains the following functions :
+    * load_configuration - returns validated configuration from file
+    * write_output - updates output data table
+    * main - main function of the script, calls the rest
 """
 
 # -- IMPORTS --
@@ -77,6 +90,33 @@ def load_configuration(path: str) -> Dict:
         + modified_configuration["cadastre_database"]["table"])
     return modified_configuration
 
+def write_output(configuration: Dict, update_list: List[Tuple], declaration_pkey: str) -> None:
+    """Write geometries update to database
+    
+    Args:
+        configuration (Dict): program configuration, with DB informations
+        update_list (List[Tuple]): list of (fid, geometry) of declarations to update
+        declaration_pkey (str): name of the private key column for declarations
+    """
+    with psycopg.connect(configuration["main_database"]["_pg_string"]) as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql.SQL("BEGIN"))
+            for entry in update_list:
+                # Vérification d'existence du lien
+                cur.execute(
+                    sql.SQL(
+                        "UPDATE {table} SET {geom_key} = ST_GeomFromText(%s) WHERE {id_key} = %s"
+                    ).format(
+                        geom_key=sql.Identifier("geom"),
+                        id_key=sql.Identifier(declaration_pkey),
+                        table=configuration["main_database"]["_table_name_sql"]
+                    ),
+                    (
+                        entry[1],
+                        entry[0],
+                    )
+                )
+            cur.execute(sql.SQL("COMMIT"))
 
 # -- MAIN FUNCTION --
 def main(configuration_file_path: str) -> None:
@@ -118,7 +158,7 @@ def main(configuration_file_path: str) -> None:
             or (is_declaration_srs_latlon and not is_cadastre_srs_latlon)
         )
     # Georeference declarations
-    declaration_updates_list = []
+    declaration_update_list = []
     for declaration_feature in declaration_ogr_layer:
         try:
             parcel_uid_list = declaration_feature.GetField("num_parcelles").split(";")
@@ -144,29 +184,10 @@ def main(configuration_file_path: str) -> None:
                     else:
                         temp_geom = new_geom.Union(parcel_geom)
                         new_geom = temp_geom
-            declaration_updates_list.append((farm_fid, new_geom.ExportToWkt()))
+            declaration_update_list.append((farm_fid, new_geom.ExportToWkt()))
     # Write output
     declaration_pkey = declaration_ogr_layer.GetFIDColumn()
-    with psycopg.connect(configuration["main_database"]["_pg_string"]) as conn:
-        with conn.cursor() as cur:
-            cur.execute("BEGIN")
-            for entry in declaration_updates_list:
-                # Vérification d'existence du lien
-                cur.execute(
-                    sql.SQL(
-                        "UPDATE {table} SET {geom_key} = ST_GeomFromText(%s) WHERE {id_key} = %s"
-                    ).format(
-                        geom_key=sql.Identifier("geom"),
-                        id_key=sql.Identifier(declaration_pkey),
-                        table=configuration["main_database"]["_table_name_sql"]
-                    ),
-                    (
-                        entry[1],
-                        entry[0],
-                    )
-                )
-            cur.execute("COMMIT")
-
+    write_output(configuration, declaration_update_list, declaration_pkey)
 
 # -- MAIN SCRIPT --
 if (__name__ == "__main__"):

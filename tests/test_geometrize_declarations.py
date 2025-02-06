@@ -17,7 +17,8 @@ import pytest
 
 from ocsge_pv.geometrize_declarations import (
     load_configuration,
-    main
+    main,
+    write_output
 )
 
 
@@ -155,20 +156,26 @@ class TestWriter(TestCase):
         ]
         m_psycopg_connect.return_value.__enter__.return_value.cursor = m_cursor
         # Call to the tested function
-        write_output(f_configuration, update_list)
+        write_output(f_configuration, update_list, "fid")
         # Assertions
         m_psycopg_connect.assert_has_calls([
             call(f_configuration["main_database"]["_pg_string"])
         ])
         m_cursor.assert_called_once_with()
         m_execute.assert_called()
-        self.assertIn(call("BEGIN"), m_execute.call_args_list)
-        self.assertIn(call("COMMIT"), m_execute.call_args_list)
+        self.assertIn(call(sql.SQL("BEGIN")), m_execute.call_args_list)
+        self.assertIn(call(sql.SQL("COMMIT")), m_execute.call_args_list)
         sql_update_count = 0
+        pattern = "UPDATE .*{2}{0}{2}\\.{2}{1}{2}.* SET \"geom\" = .* WHERE \"fid\" = ".format(
+            f_configuration["main_database"]["schema"],
+            f_configuration["main_database"]["table"],
+            "['\\\\]+"
+        )
         for call_entry in m_execute.call_args_list:
-            if re.match("UPDATE", call_entry[0][0]):
+            query = call_entry[0][0].as_string()
+            if re.match(pattern, query):
                 sql_update_count += 1
-        self.assertGreater(sql_update_count, 0)
+        self.assertEqual(sql_update_count, 3)
 
 
 # TODO Features to test :
@@ -192,14 +199,16 @@ class TestMain(TestCase):
 
     @patch("osgeo.osr.CreateCoordinateTransformation")
     @patch("osgeo.ogr.Open")
+    @patch("ocsge_pv.geometrize_declarations.write_output")
     @patch("ocsge_pv.geometrize_declarations.load_configuration")
-    def test_ok(self, m_loader, m_ogr_open, m_osr_createct):
+    def test_ok(self, m_loader, m_writer, m_ogr_open, m_osr_createct):
         # Preparation
         ## OGR/OSR entities 
         m_main_ogr_ds = MagicMock()
         m_main_ogr_lay = MagicMock()
         m_main_ogr_sr = MagicMock()
         m_main_ogr_lay.GetSpatialRef.return_value = m_main_ogr_sr
+        m_main_ogr_lay.GetFIDColumn.return_value = "fid"
         m_main_ogr_ds.GetLayerByName.return_value = m_main_ogr_lay
         m_main_ogr_sr.GetName.return_value = "RGF93 v1 / Lambert-93"
         m_main_ogr_sr.EPSGTreatsAsLatLong.return_value = None
@@ -211,7 +220,8 @@ class TestMain(TestCase):
         m_parcel_ogr_sr.GetName.return_value = "WGS 84"
         m_parcel_ogr_sr.EPSGTreatsAsLatLong.return_value = None
         m_ogr_open.side_effect=[m_main_ogr_ds, m_parcel_ogr_ds]
-        ## Configuration object
+        ## Configuration
+        f_config_path = "tests/fixtures/geometrize_config.ok.json"
         f_configuration = deepcopy(self.f_configuration)
         m_loader.return_value = f_configuration
         # Call to the tested function
@@ -232,7 +242,13 @@ class TestMain(TestCase):
         m_parcel_ogr_lay.GetSpatialRef.assert_called_once()
         m_parcel_ogr_sr.GetName.assert_called_once()
         m_parcel_ogr_sr.EPSGTreatsAsLatLong.assert_called_once()
-        m_osr_createct.assert_called_once_with(m_parcel_ogr_sr, m_main_ogr_sr)
+        m_osr_createct.assert_called_once_with(
+            m_parcel_ogr_sr,
+            m_main_ogr_sr)
+        m_writer.assert_called_once_with(
+            f_configuration,
+            [],
+            m_main_ogr_lay.GetFIDColumn.return_value)
 
 
 

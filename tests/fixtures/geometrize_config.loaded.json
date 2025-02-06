@@ -1,0 +1,26 @@
+{
+    "main_database": {
+        "host": "192.168.0.1",
+        "port": 5432,
+        "name": "ocsge",
+        "user": "data_producer",
+        "password": "bip-boop-123456",
+        "schema": "photovoltaic",
+        "table": "declaration",
+        "_pg_string": "host=192.168.0.1 port=5432 dbname=ocsge user=data_producer password=bip-boop-123456",
+        "_table_name_raw": "photovoltaic.declaration",
+        "_table_name_sql": "SQL('photovoltaic'.'declaration')"
+    },
+    "cadastre_database": {
+        "host": "localhost",
+        "port": 5433,
+        "name": "cadastre",
+        "user": "land_surveyor",
+        "password": "1arpent",
+        "schema": "cadastre_data",
+        "table": "parcels",
+        "_pg_string": "host=localhost port=5433 dbname=cadastre user=land_surveyor password=1arpent",
+        "_table_name_raw": "cadastre_data.parcels"
+    },
+    "procedure_number": 98746
+}
