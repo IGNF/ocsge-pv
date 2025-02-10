@@ -21,6 +21,5 @@
         "table": "parcels",
         "_pg_string": "host=localhost port=5433 dbname=cadastre user=land_surveyor password=1arpent",
         "_table_name_raw": "cadastre_data.parcels"
-    },
-    "procedure_number": 98746
+    }
 }

@@ -1,0 +1,18 @@
+{
+    "output": {
+        "host": "192.168.0.1",
+        "port": 5432,
+        "name": "ocsge",
+        "user": "data_producer",
+        "password": "bip-boop-123456",
+        "schema": "photovoltaic",
+        "table": "declaration",
+        "_pg_string": "host=192.168.0.1 port=5432 dbname=ocsge user=data_producer password=bip-boop-123456",
+        "_table_name_sql": "SQL('photovoltaic'.'declaration')"
+    },
+    "input": {
+        "api_url": "https://www.demarches-simplifiees.fr/api/v2/graphql",
+        "auth_token": "A9Knc34tP==",
+        "demarche_id": 1546
+    }
+}

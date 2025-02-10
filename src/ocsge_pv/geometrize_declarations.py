@@ -36,6 +36,13 @@ from psycopg import sql
 # -- GLOBALS --
 ogr.UseExceptions()
 osr.UseExceptions()
+try:
+    timezone_name = os.environ["TZ"]
+    print(f"Zone horaire définie par VE : '{timezone_name}'")
+except KeyError:
+    timezone_name = "Europe/Paris"
+    print(f"Zone horaire définie par défaut : '{timezone_name}'")
+timezone_info = ZoneInfo(timezone_name)
 
 # -- FUNCTIONS --
 def load_configuration(path: str) -> Dict:
@@ -192,7 +199,9 @@ def main(configuration_file_path: str) -> None:
 # -- MAIN SCRIPT --
 if (__name__ == "__main__"):
     try:
+        print(datetime.now(timezone_info), "|", "Début de l'édition des géométries des données de déclaration.")
         main(sys.argv[1:])
+        print(datetime.now(timezone_info), "|", "Fin de l'édition des géométries des données de déclaration.")
         sys.exit(0)
     except Exception as exc:
         print(exc)

@@ -1,18 +1,18 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "pairing_configuration",
-    "title": "Pairing configuration",
-    "description": "The configuration for the pairing program",
+    "$id": "import_declarations_config",
+    "title": "Geometrization configuration",
+    "description": "The configuration for the geometrization program",
     "type": "object",
     "properties": {
-        "main_database": {
-            "description": "Connection details: access to database tables describing photovoltaic installations (detected, declared, or the links between the two)",
+        "output": {
+            "description": "Connection details: access to a database table describing declared photovoltaic installations",
             "type": "object",
             "properties": {
                 "host": {
                     "description": "Database hostname",
                     "type": "string",
-                    "oneOf": [
+                    "anyOf": [
                         {
                             "format": "hostname"
                         },
@@ -47,32 +47,10 @@
                     "type": "string",
                     "pattern": "^[a-z_]+$"
                 },
-                "tables": {
-                    "description": "Name of the tables",
-                    "type": "object",
-                    "properties": {
-                        "detections": {
-                            "description": "Table: Detected photovoltaic installations",
-                            "type": "string",
-                            "pattern": "^[a-z_]+$"
-                        },
-                        "declarations": {
-                            "description": "Table: Declared photovoltaic installations",
-                            "type": "string",
-                            "pattern": "^[a-z_]+$"
-                        },
-                        "links": {
-                            "description": "Table: Links pairing entries from the other tables, when describing a same installation",
-                            "type": "string",
-                            "pattern": "^[a-z_]+$"
-                        }
-                    },
-                    "additionalProperties": false,
-                    "required": [
-                        "detections",
-                        "declarations",
-                        "links"
-                    ]
+                "table": {
+                    "description": "Name of the table",
+                    "type": "string",
+                    "pattern": "^[a-z_]+$"
                 }
             },
             "additionalProperties": false,
@@ -83,12 +61,39 @@
                 "user",
                 "password",
                 "schema",
-                "tables"
+                "table"
+            ]
+        },
+        "input": {
+            "description": "Connection details: access to the GraphQL API of demarches-simplifiees.fr",
+            "type": "object",
+            "properties": {
+                "api_url": {
+                    "description": "Root url for the API.",
+                    "type": "string",
+                    "format": "uri"
+                },
+                "auth_token": {
+                    "description": "Authentification token required to use the API.",
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9+~/._-]+=?="
+                },
+                "demarche_id": {
+                    "description": "Identifier for the procedure.",
+                    "type": "integer"
+                }
+            },
+            "additionalProperties": false,
+            "required": [
+                "api_url",
+                "auth_token",
+                "demarche_id"
             ]
         }
     },
     "additionalProperties": false,
     "required": [
-        "main_database"
+        "input",
+        "output"
     ]
 }

@@ -1,5 +1,5 @@
 {
-    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "geometrize_config",
     "title": "Geometrization configuration",
     "description": "The configuration for the geometrization program",
@@ -122,10 +122,6 @@
                 "schema",
                 "table"
             ]
-        },
-        "procedure_number": {
-            "description": "Identifier for the procedure on the https://www.demarches-simplifiees.fr/ platform.",
-            "type": "integer"
         }
     },
     "additionalProperties": false,
