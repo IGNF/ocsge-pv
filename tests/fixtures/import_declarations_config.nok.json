@@ -10,7 +10,6 @@
     },
     "input": {
         "api_url": "https://www.demarches-simplifiees.fr/api/v2/graphql",
-        "auth_token": "A9Knc34tP==",
-        "demarche_id": 1546
+        "auth_token": "A9Knc34tP=="
     }
 }

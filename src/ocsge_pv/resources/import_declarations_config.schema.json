@@ -1,8 +1,8 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "import_declarations_config",
-    "title": "Geometrization configuration",
-    "description": "The configuration for the geometrization program",
+    "title": "Declarations importer configuration",
+    "description": "The configuration for the declarations import program",
     "type": "object",
     "properties": {
         "output": {

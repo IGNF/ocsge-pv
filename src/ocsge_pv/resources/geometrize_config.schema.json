@@ -127,7 +127,6 @@
     "additionalProperties": false,
     "required": [
         "main_database",
-        "cadastre_database",
-        "procedure_number"
+        "cadastre_database"
     ]
 }

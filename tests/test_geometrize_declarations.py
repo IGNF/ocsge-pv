@@ -5,6 +5,7 @@ See internal docstrings for more information.
 Each variable prefixed by "m_" is a mock, or part of it.
 Each variable prefixed by "f_" is a fixture.
 """
+
 from copy import deepcopy
 import json
 import re
@@ -20,8 +21,6 @@ from ocsge_pv.geometrize_declarations import (
     main,
     write_output
 )
-
-
 
 #Tests
 class TestConfigurationValidationSchema(TestCase):
@@ -176,18 +175,6 @@ class TestWriter(TestCase):
             if re.match(pattern, query):
                 sql_update_count += 1
         self.assertEqual(sql_update_count, 3)
-
-
-# TODO Features to test :
-# * ~~read configuration~~
-# * connect to database
-# * read photovoltaic input table
-# * check if geometry is initialised
-# * read cadastral input table
-# * convert between spatial reference systems with axis permutation
-# * convert between spatial reference systems without axis permutation
-# * compute geometry
-# * write in photovoltaic output table (same one as input)
 
 class TestMain(TestCase):
     """Tests the main routine, entrypoint for the executable."""

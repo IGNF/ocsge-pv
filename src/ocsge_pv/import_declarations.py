@@ -23,7 +23,7 @@ from datetime import date, datetime
 import json
 import os
 import re
-from typing import Dict
+from typing import Dict, List
 from zoneinfo import ZoneInfo
 
 # 3rd party
@@ -49,10 +49,10 @@ def format_feature(input: Dict) -> Dict:
     """Transform declaration dossier to postgis feature
 
     Args:
-        input (Dict) - dossier's data for a single declaration
+        input (Dict): dossier's data for a single declaration
 
     Returns:
-        Dict - structure to insert in the output database
+        Dict: structure to insert in the output database
     """
     output = {
         "id_dossier": None,
@@ -217,7 +217,7 @@ def format_feature(input: Dict) -> Dict:
                             contains_raw_geometry = True
                     if len(parcels_list) == 0:
                         raise ValueError("Selected parcels list must contain at least one element.")
-                    if contains_raw_geometry
+                    if contains_raw_geometry:
                         raise ValueError(f"ERROR: dossier '{dossier_number}' contains raw geometries")
             except KeyError as exc:
                 print("ERROR: ", exc)
@@ -235,10 +235,10 @@ def format_source_result(data: Dict) -> List:
     """Transform input data to output data
 
     Args:
-        data (Dict) - input data with its original structure
+        data (Dict): input data with its original structure
 
     Returns:
-        List - features list with the target SQL table structure
+        List: features list with the target SQL table structure
     """
     feature_list = []
     id_list = []
@@ -247,6 +247,7 @@ def format_source_result(data: Dict) -> List:
             id_list.append(entry["number"])
             feature = format_feature(entry)
             feature_list.append(feature)
+    feature_list.sort(key=lambda feature: feature["id_dossier"])
     return deepcopy(feature_list)
 
 def load_configuration(path: str) -> Dict:
@@ -286,10 +287,10 @@ def query_source_api(input_conf: Dict) -> Dict:
     """Read input data from the source GraphQL API
 
     Args:
-        input_conf (Dict) - configuration used to access the API
+        input_conf (Dict): configuration used to access the API
 
     Returns:
-        Dict - The converted input data with its original structure
+        Dict: The converted input data with its original structure
     """
     gql_headers = {
         "Authorization": "Bearer {0:s}".format(input_conf["auth_token"]) 
@@ -313,8 +314,12 @@ def query_source_api(input_conf: Dict) -> Dict:
     query_params = {
         "demarcheNumber": input_conf["demarche_id"],
         "includeDossiers": True,
-        "includeChamps": True
+        "includeChamps": True,
+        "state": "accepte",
+        "order": "ASC"
     }
+    if min_update_datetime is not None:
+        query_params["updatedSince"] = min_update_datetime
     result = gql_client.execute(query_gql, variable_values=query_params)
     return deepcopy(result)
 
@@ -322,40 +327,61 @@ def write_output(output_conf: Dict, data: List) -> None:
     """Write declarations to database
     
     Args:
-        configuration (Dict): program configuration, with DB informations
-        update_list (List[Tuple]): list of (fid, geometry) of declarations to update
+        output_conf (Dict): configuration used to access the database
+        data (List): list of output data to insert
     """
     declaration_id_list = []
     with psycopg.connect(output_conf["_pg_string"]) as conn:
         with conn.cursor() as cur:
             cur.execute(sql.SQL("BEGIN"))
             for feature in data:
-                keys_list = []
-                values_list = []
-                for field in feature.keys():
-                    keys_list.append(sql.Identifier(field))
-                    values_list.append(feature[field])
-                instruction = sql.SQL(
-                    "INSERT INTO {table} ({keys}) VALUES({values})"
-                ).format(
-                        table=output_conf["_table_name_sql"]
-                        keys=sql.SQL(", ").join(keys_list),
-                        values=sql.SQL(", ").join(sql.Placeholder() * len(values_list))
-                )
-                cur.execute(
-                    instruction,
-                    values_list
-                )
+                id_count_row = cur.execute(
+                    sql.SQL(
+                        "SELECT COUNT(*) FROM {table} WHERE {id_key} = {id_value}"
+                    ).format(
+                        table=output_conf["_table_name_sql"],
+                        id_key=sql.Identifier("id_dossier"),
+                        id_value=sql.Placeholder()
+                    ),
+                    feature["id_dossier"]
+                ).fetchone()
+                if id_count_row[0] == 0:
+                    keys_list = []
+                    values_list = []
+                    for field in feature.keys():
+                        keys_list.append(sql.Identifier(field))
+                        values_list.append(feature[field])
+                    instruction = sql.SQL(
+                        "INSERT INTO {table} ({keys}) VALUES({values})"
+                    ).format(
+                            table=output_conf["_table_name_sql"],
+                            keys=sql.SQL(", ").join(keys_list),
+                            values=sql.SQL(", ").join(sql.Placeholder() * len(values_list))
+                    )
+                    cur.execute(
+                        instruction,
+                        values_list
+                    )
+                elif id_count_row[0] == 1:
+                    # Was to do if this declaration is already described in the database ?
+                    print()
+                else:
+                    raise ValueError(("To many declarations found in database with id_dossier="
+                        + f"{feature['id_dossier']}: {id_count_row[0]} entries found."))
             cur.execute(sql.SQL("COMMIT"))
 
 # -- MAIN FUNCTION --
-def main(configuration_file_path: str) -> None:
+def main(configuration_file_path: str, min_update_datetime: str=None) -> None:
     """Main routine, entrypoint for the program
         
     Args:
         configuration_file_path (str): path to the configuration file
+        min_update_datetime (str): Date/Time filter (ISO8601DateTime)
+            only import more recent dossiers
     """
     configuration = load_configuration(configuration_file_path)
+    if min_update_datetime is not None:
+        datetime.fromisoformat(min_update_datetime) # check date format validity
     input_data = query_source_api(configuration["input"])
     output_data = format_source_result(input_data)
     write_output(configuration["output"], output_data)
