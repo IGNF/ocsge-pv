@@ -105,25 +105,28 @@ def write_output(configuration: Dict, update_list: List[Tuple], declaration_pkey
         update_list (List[Tuple]): list of (fid, geometry) of declarations to update
         declaration_pkey (str): name of the private key column for declarations
     """
-    with psycopg.connect(configuration["main_database"]["_pg_string"]) as conn:
-        with conn.cursor() as cur:
-            cur.execute(sql.SQL("BEGIN"))
-            for entry in update_list:
-                # Vérification d'existence du lien
-                cur.execute(
-                    sql.SQL(
-                        "UPDATE {table} SET {geom_key} = ST_GeomFromText(%s) WHERE {id_key} = %s"
-                    ).format(
-                        geom_key=sql.Identifier("geom"),
-                        id_key=sql.Identifier(declaration_pkey),
-                        table=configuration["main_database"]["_table_name_sql"]
-                    ),
-                    (
-                        entry[1],
-                        entry[0],
+    with psycopg.connect(configuration["main_database"]["_pg_string"], autocommit=True) as conn:
+        cur = conn.cursor()
+        try:
+            with conn.transaction():
+                for entry in update_list:
+                    # Vérification d'existence du lien
+                    cur.execute(
+                        sql.SQL(
+                            "UPDATE {table} SET {geom_key} = ST_GeomFromText(%s) WHERE {id_key} = %s"
+                        ).format(
+                            geom_key=sql.Identifier("geom"),
+                            id_key=sql.Identifier(declaration_pkey),
+                            table=configuration["main_database"]["_table_name_sql"]
+                        ),
+                        (
+                            entry[1],
+                            entry[0],
+                        )
                     )
-                )
-            cur.execute(sql.SQL("COMMIT"))
+        except Exception as exc:
+            conn.rollback()
+            raise exc
 
 # -- MAIN FUNCTION --
 def main(configuration_file_path: str) -> None:

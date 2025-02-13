@@ -5,8 +5,46 @@
     "description": "The configuration for the declarations import program",
     "type": "object",
     "properties": {
+        "input": {
+            "description": "Source datasource for declarations (demarches-simplifiees.fr service)",
+            "type": "object",
+            "properties": {
+                "api_url": {
+                    "description": "Root url for the GraphQL API.",
+                    "type": "string",
+                    "format": "uri",
+                    "examples": ["https://www.demarches-simplifiees.fr/api/v2/graphql"]
+                },
+                "auth_token": {
+                    "description": "Authentification token required to use the API.",
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9+~/._-]+=?=",
+                    "examples": ["A9Knc34tP=="]
+                },
+                "demarche_id": {
+                    "description": "Identifier for the procedure.",
+                    "type": "integer",
+                    "examples": [1546]
+                },
+                "min_update_datetime" : {
+                    "description": "Filter out any dossier before this Date/Time (optional, default to null). See RFC 3339 section 5.6 for a syntax guide.",
+                    "type": "string",
+                    "format": "date-time",
+                    "examples": [
+                        "2025-02-13T11:56:54.950481+01:00",
+                        "2024-10-07T00:00:00.000000+02:00"
+                    ]
+                }
+            },
+            "additionalProperties": false,
+            "required": [
+                "api_url",
+                "auth_token",
+                "demarche_id"
+            ]
+        },
         "output": {
-            "description": "Connection details: access to a database table describing declared photovoltaic installations",
+            "description": "Target datasource for declared photovoltaic installations",
             "type": "object",
             "properties": {
                 "host": {
@@ -14,43 +52,52 @@
                     "type": "string",
                     "anyOf": [
                         {
-                            "format": "hostname"
+                            "format": "hostname",
+                            "examples": ["data.geopf.fr"]
                         },
                         {
-                            "format": "ipv4"
+                            "format": "ipv4",
+                            "examples": ["192.168.0.1"]
                         },
                         {
-                            "format": "ipv6"
+                            "format": "ipv6",
+                            "examples": ["2001:0db8:0000:85a3:0000:0000:ac1f:8001"]
                         }
                     ]
                 },
                 "port": {
                     "description": "Database host's port",
-                    "type": "integer"
+                    "type": "integer",
+                    "examples": [5432]
                 },
                 "name": {
                     "description": "Database's name on the host server",
                     "type": "string",
-                    "pattern": "^[a-z_]+$"
+                    "pattern": "^[a-z_]+$",
+                    "examples": ["ocsge"]
                 },
                 "user": {
                     "description": "User's name",
                     "type": "string",
-                    "pattern": "^[a-z_]+$"
+                    "pattern": "^[a-z_]+$",
+                    "examples": ["data_producer"]
                 },
                 "password": {
                     "description": "User's password",
-                    "type": "string"
+                    "type": "string",
+                    "examples": ["bip-boop-123456"]
                 },
                 "schema": {
                     "description": "Name of the schema",
                     "type": "string",
-                    "pattern": "^[a-z_]+$"
+                    "pattern": "^[a-z_]+$",
+                    "examples": ["photovoltaic"]
                 },
                 "table": {
                     "description": "Name of the table",
                     "type": "string",
-                    "pattern": "^[a-z_]+$"
+                    "pattern": "^[a-z_]+$",
+                    "examples": ["declaration"]
                 }
             },
             "additionalProperties": false,
@@ -62,32 +109,6 @@
                 "password",
                 "schema",
                 "table"
-            ]
-        },
-        "input": {
-            "description": "Connection details: access to the GraphQL API of demarches-simplifiees.fr",
-            "type": "object",
-            "properties": {
-                "api_url": {
-                    "description": "Root url for the API.",
-                    "type": "string",
-                    "format": "uri"
-                },
-                "auth_token": {
-                    "description": "Authentification token required to use the API.",
-                    "type": "string",
-                    "pattern": "^[A-Za-z0-9+~/._-]+=?="
-                },
-                "demarche_id": {
-                    "description": "Identifier for the procedure.",
-                    "type": "integer"
-                }
-            },
-            "additionalProperties": false,
-            "required": [
-                "api_url",
-                "auth_token",
-                "demarche_id"
             ]
         }
     },

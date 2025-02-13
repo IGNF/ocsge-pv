@@ -318,8 +318,8 @@ def query_source_api(input_conf: Dict) -> Dict:
         "state": "accepte",
         "order": "ASC"
     }
-    if min_update_datetime is not None:
-        query_params["updatedSince"] = min_update_datetime
+    if input_conf["min_update_datetime"] is not None:
+        query_params["updatedSince"] = input_conf["min_update_datetime"]
     result = gql_client.execute(query_gql, variable_values=query_params)
     return deepcopy(result)
 
@@ -331,57 +331,75 @@ def write_output(output_conf: Dict, data: List) -> None:
         data (List): list of output data to insert
     """
     declaration_id_list = []
-    with psycopg.connect(output_conf["_pg_string"]) as conn:
-        with conn.cursor() as cur:
-            cur.execute(sql.SQL("BEGIN"))
-            for feature in data:
-                id_count_row = cur.execute(
-                    sql.SQL(
-                        "SELECT COUNT(*) FROM {table} WHERE {id_key} = {id_value}"
-                    ).format(
-                        table=output_conf["_table_name_sql"],
-                        id_key=sql.Identifier("id_dossier"),
-                        id_value=sql.Placeholder()
-                    ),
-                    feature["id_dossier"]
-                ).fetchone()
-                if id_count_row[0] == 0:
-                    keys_list = []
-                    values_list = []
-                    for field in feature.keys():
-                        keys_list.append(sql.Identifier(field))
-                        values_list.append(feature[field])
-                    instruction = sql.SQL(
-                        "INSERT INTO {table} ({keys}) VALUES({values})"
-                    ).format(
+    with psycopg.connect(output_conf["_pg_string"], autocommit=True) as conn:
+        cur = conn.cursor()
+        try:
+            with conn.transaction():
+                for feature in data:
+                    id_count_row = cur.execute(
+                        sql.SQL(
+                            "SELECT COUNT(*) FROM {table} WHERE {id_key} = {id_value}"
+                        ).format(
                             table=output_conf["_table_name_sql"],
-                            keys=sql.SQL(", ").join(keys_list),
-                            values=sql.SQL(", ").join(sql.Placeholder() * len(values_list))
-                    )
-                    cur.execute(
-                        instruction,
-                        values_list
-                    )
-                elif id_count_row[0] == 1:
-                    # Was to do if this declaration is already described in the database ?
-                    print()
-                else:
-                    raise ValueError(("To many declarations found in database with id_dossier="
-                        + f"{feature['id_dossier']}: {id_count_row[0]} entries found."))
-            cur.execute(sql.SQL("COMMIT"))
+                            id_key=sql.Identifier("id_dossier"),
+                            id_value=sql.Placeholder()
+                        ),
+                        feature["id_dossier"]
+                    ).fetchone()
+                    if id_count_row[0] == 0:
+                        keys_list = []
+                        values_list = []
+                        for field in feature.keys():
+                            keys_list.append(sql.Identifier(field))
+                            values_list.append(feature[field])
+                        instruction = sql.SQL(
+                            "INSERT INTO {table} ({keys}) VALUES({values})"
+                        ).format(
+                                table=output_conf["_table_name_sql"],
+                                keys=sql.SQL(", ").join(keys_list),
+                                values=sql.SQL(", ").join(sql.Placeholder() * len(values_list))
+                        )
+                        cur.execute(
+                            instruction,
+                            values_list
+                        )
+                    elif id_count_row[0] == 1:
+                        # Was to do if this declaration is already described in the database ?
+                        keys_list = []
+                        values_list = []
+                        for field in feature.keys():
+                            if field != "id_dossier":
+                                keys_list.append(sql.Identifier(field))
+                                values_list.append(feature[field])
+                        instruction = sql.SQL(
+                            "UPDATE {table} SET ({keys}) = ({values}) WHERE {id_key} = {id_value}"
+                        ).format(
+                                table=output_conf["_table_name_sql"],
+                                keys=sql.SQL(", ").join(keys_list),
+                                values=sql.SQL(", ").join(sql.Placeholder() * len(values_list),
+                                id_key=sql.Identifier("id_dossier"),
+                                id_value=sql.Placeholder())
+                        )
+                        cur.execute(
+                            instruction,
+                            values_list,
+                            feature["id_dossier"]
+                        )
+                    else:
+                        raise ValueError(("To many declarations found in database with id_dossier="
+                            + f"{feature['id_dossier']}: {id_count_row[0]} entries found."))
+        except Exception as exc:
+            conn.rollback()
+            raise exc
 
 # -- MAIN FUNCTION --
-def main(configuration_file_path: str, min_update_datetime: str=None) -> None:
+def main(configuration_file_path: str) -> None:
     """Main routine, entrypoint for the program
         
     Args:
         configuration_file_path (str): path to the configuration file
-        min_update_datetime (str): Date/Time filter (ISO8601DateTime)
-            only import more recent dossiers
     """
     configuration = load_configuration(configuration_file_path)
-    if min_update_datetime is not None:
-        datetime.fromisoformat(min_update_datetime) # check date format validity
     input_data = query_source_api(configuration["input"])
     output_data = format_source_result(input_data)
     write_output(configuration["output"], output_data)

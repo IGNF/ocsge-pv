@@ -11,6 +11,7 @@
     "input": {
         "api_url": "https://www.demarches-simplifiees.fr/api/v2/graphql",
         "auth_token": "A9Knc34tP==",
-        "demarche_id": 1546
+        "demarche_id": 1546,
+        "min_update_datetime": "2025-02-13T11:56:54.950481+01:00"
     }
 }
