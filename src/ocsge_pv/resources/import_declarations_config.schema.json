@@ -90,13 +90,13 @@
                 "schema": {
                     "description": "Name of the schema",
                     "type": "string",
-                    "pattern": "^[a-z_]+$",
+                    "pattern": "^[0-9a-z_]+$",
                     "examples": ["photovoltaic"]
                 },
                 "table": {
                     "description": "Name of the table",
                     "type": "string",
-                    "pattern": "^[a-z_]+$",
+                    "pattern": "^[0-9a-z_]+$",
                     "examples": ["declaration"]
                 }
             },

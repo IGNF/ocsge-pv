@@ -45,7 +45,7 @@
                 "schema": {
                     "description": "Name of the schema",
                     "type": "string",
-                    "pattern": "^[a-z_]+$"
+                    "pattern": "^[0-9a-z_]+$"
                 },
                 "tables": {
                     "description": "Name of the tables",
@@ -54,17 +54,17 @@
                         "detections": {
                             "description": "Table: Detected photovoltaic installations",
                             "type": "string",
-                            "pattern": "^[a-z_]+$"
+                            "pattern": "^[0-9a-z_]+$"
                         },
                         "declarations": {
                             "description": "Table: Declared photovoltaic installations",
                             "type": "string",
-                            "pattern": "^[a-z_]+$"
+                            "pattern": "^[0-9a-z_]+$"
                         },
                         "links": {
                             "description": "Table: Links pairing entries from the other tables, when describing a same installation",
                             "type": "string",
-                            "pattern": "^[a-z_]+$"
+                            "pattern": "^[0-9a-z_]+$"
                         }
                     },
                     "additionalProperties": false,

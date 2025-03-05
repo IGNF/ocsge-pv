@@ -45,12 +45,12 @@
                 "schema": {
                     "description": "Name of the schema",
                     "type": "string",
-                    "pattern": "^[a-z_]+$"
+                    "pattern": "^[0-9a-z_]+$"
                 },
                 "table": {
                     "description": "Name of the table",
                     "type": "string",
-                    "pattern": "^[a-z_]+$"
+                    "pattern": "^[0-9a-z_]+$"
                 }
             },
             "additionalProperties": false,
@@ -104,12 +104,12 @@
                 "schema": {
                     "description": "Name of the schema",
                     "type": "string",
-                    "pattern": "^[a-z_]+$"
+                    "pattern": "^[0-9a-z_]+$"
                 },
                 "table": {
                     "description": "Name of the table",
                     "type": "string",
-                    "pattern": "^[a-z_]+$"
+                    "pattern": "^[0-9a-z_]+$"
                 }
             },
             "additionalProperties": false,

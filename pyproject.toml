@@ -58,6 +58,7 @@ test = [
 "Source" = "https://github.com/IGNF/ocsge-pv"
 
 [project.scripts]
+import_declarations = "ocsge_pv.import_declarations:main"
 geometrize_declarations = "ocsge_pv.geometrize_declarations:main"
 pair_from_sources = "ocsge_pv.pair_from_sources:main"
 
