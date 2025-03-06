@@ -24,7 +24,7 @@ from copy import deepcopy
 from datetime import date, datetime
 import json
 import os
-import pathlib
+from pathlib import Path
 import re
 import sys
 import traceback
@@ -65,7 +65,7 @@ def cli_arg_parser() -> argparse.Namespace:
             + " service API, and insert them into a database.")
     )
     parser.add_argument("path",
-        type=pathlib.Path,
+        type=Path,
         help="the path of the configuration file for %(prog)s"
     )
     parser.add_argument("-v", "--verbose",
@@ -124,6 +124,7 @@ def format_feature(in_data: Dict) -> Dict:
     if in_data is not None:
         dossier_number = in_data["number"]
         out_data["id_dossier"] = dossier_number
+        out_data["last_update"] = datetime.fromisoformat(in_data["dateDerniereModification"])
         parcels_list = []
         contains_raw_geometry = False
         for champ in in_data["champs"]:
@@ -293,13 +294,15 @@ def load_configuration(path: str) -> Dict:
         path (str): path to the configuration file
     
     Raises:
-        jonschema.ValidationError: The configuration file does not match the validation schema
+        jonschema.ValidationError: The configuration file does
+            not match the validation schema
 
     Returns:
         Dict: the configuration object translated from the input file
     """
     try:
-        validation_schema_path = "src/ocsge_pv/resources/import_declarations_config.schema.json"
+        validation_schema_path = Path(os.environ["HOME"],
+            "ocsge-pv-resources/import_declarations_config.schema.json")
         with open(path, "r", encoding="utf-8") as config_file:
             config_str = config_file.read()
         source_configuration = json.loads(config_str)
@@ -354,7 +357,8 @@ def query_source_api(input_conf: Dict) -> Dict:
         client_session_args=aiohttp_client_session_args
     )
     gql_client = Client(transport=transport, fetch_schema_from_transport=True)
-    with open("src/ocsge_pv/resources/get_demarche_query.gql", encoding="utf-8") as query_file:
+    gql_query_filepath = Path(os.environ["HOME"], "ocsge-pv-resources/get_demarche_query.gql")
+    with open(gql_query_filepath, encoding="utf-8") as query_file:
         query_string = query_file.read()
     query_gql = gql(query_string)
     query_params = {
