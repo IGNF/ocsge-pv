@@ -23,6 +23,7 @@ import argparse
 from copy import deepcopy
 from datetime import date, datetime
 import json
+import logging
 import os
 from pathlib import Path
 import re
@@ -33,7 +34,7 @@ from zoneinfo import ZoneInfo
 
 # 3rd party
 from gql import gql, Client
-from gql.transport.aiohttp import AIOHTTPTransport
+from gql.transport.aiohttp import AIOHTTPTransport, log as AIOHTTPTransport_logger
 import jsonschema
 import psycopg
 from psycopg import sql
@@ -41,6 +42,12 @@ from psycopg import sql
 # package
 
 # -- GLOBALS --
+NAME = "import_declarations"
+logging.basicConfig(level=logging.INFO,
+    format="%(asctime)s %(name)s\(%(funcName)s\) %(levelname)s: %(message)s")
+# logging.captureWarnings(True)
+AIOHTTPTransport_logger.setLevel(logging.WARNING)
+logger = logging.getLogger(NAME)
 try:
     timezone_name = os.environ["TZ"]
     print(f"Zone horaire définie par VE : '{timezone_name}'")
@@ -60,7 +67,7 @@ def cli_arg_parser() -> argparse.Namespace:
         argparse.Namespace: processed arguments
     """
     parser = argparse.ArgumentParser(
-        prog="import_declarations",
+        prog=NAME,
         description=("Import photovoltaic farms declaration files from the official declaration"
             + " service API, and insert them into a database.")
     )
@@ -252,8 +259,8 @@ def format_feature(in_data: Dict) -> Dict:
                         raise ValueError(f"dossier '{dossier_number}' contains raw geometries")
             except (KeyError, TypeError, ValueError) as exc:
                 exc_type = str(type(exc)).replace("<class '", "").replace("'>", "")
-                log(f"WARNING (format_feature): on dossier '{dossier_number}', champ '{field_name}'")
-                log(f"---------- {exc_type}: ", exc)
+                logger.warning(f"on dossier '{dossier_number}', champ '{field_name}'")
+                logger.warning(f"---------- {exc_type}: {exc.args[0]}")
         try:
             if out_data["porteur"]:
                 out_data["siret_port"] = str(in_data["demandeur"]['siret'])
@@ -262,9 +269,8 @@ def format_feature(in_data: Dict) -> Dict:
             if len(parcels_list) > 0:
                 out_data["num_parcelles"] = ";".join(parcels_list)
         except Exception as exc:
-            exc_type = str(type(exc)).replace("<class '", "").replace("'>", "")
-            log(f"ERROR (format_feature): on dossier '{dossier_number}'")
-            log(f"---------- {exc_type}: ", exc)
+            logger.error(f"on dossier '{dossier_number}'")
+            logger.error(f"---------- {traceback.format_exc()}")
             raise exc
     return out_data
     
@@ -287,7 +293,7 @@ def format_source_result(data: Dict) -> List:
     feature_list.sort(key=lambda feature: feature["id_dossier"])
     return deepcopy(feature_list)
 
-def load_configuration(path: str) -> Dict:
+def load_configuration(path: Path) -> Dict:
     """Returns validated configuration from file
     
     Args:
@@ -320,17 +326,8 @@ def load_configuration(path: str) -> Dict:
             + " password=" + modified_configuration['output']['password'])
         return modified_configuration
     except Exception as exc:
-        exc_type = str(type(exc)).replace("<class '", "").replace("'>", "")
-        log(f"ERROR (load_configuration) - {exc_type}:", exc)
+        logger.error(traceback.format_exc())
         raise exc
-
-def log(*message: str) -> None:
-    """Prints message with date and time
-
-    Args:
-        message (str): messages to log (like in the print function)
-    """
-    print(datetime.now(timezone_info), "|", *message)
 
 def query_source_api(input_conf: Dict) -> Dict:
     """Read input data from the source GraphQL API
@@ -427,21 +424,19 @@ def write_output(output_conf: Dict, data: List) -> None:
                         ).format(
                                 table=sql.Identifier(output_conf["schema"], output_conf["table"]),
                                 keys=sql.SQL(", ").join(keys_list),
-                                values=sql.SQL(", ").join(sql.Placeholder() * values_count,
+                                values=sql.SQL(", ").join(sql.Placeholder() * values_count),
                                 id_key=sql.Identifier("id_dossier"),
-                                id_value=sql.Placeholder())
+                                id_value=feature["id_dossier"]
                         )
                         cur.execute(
                             instruction,
-                            values_list,
-                            feature["id_dossier"]
+                            values_list
                         )
                     else:
                         raise ValueError(("To many declarations found in database with id_dossier="
                             + f"{feature['id_dossier']}: {id_count_row[0]} entries found."))
         except Exception as exc:
-            exc_type = str(type(exc)).replace("<class '", "").replace("'>", "")
-            log(f"ERROR (write_output) - {exc_type}:", traceback.format_exc())
+            logger.error(traceback.format_exc())
             conn.rollback()
             raise exc
 
@@ -450,32 +445,29 @@ def main() -> None:
     """Main routine, entrypoint for the program
         
     Args:
-        configuration_file_path (str): path to the configuration file
+        path (str): path to the configuration file
             (implicit, contained in sys.argv[])
     
     Returns:
         int: shell exit code of the execution
     """
     try:
-        log("Start of declaration data import.")
+        logger.info("Start of declaration data import.")
         cli_args = cli_arg_parser()
         if cli_args.verbose:
-            log("Loading configuration...")
+            logger.setLevel(logging.DEBUG)
+        logger.debug("Loading configuration...")
         configuration = load_configuration(cli_args.path)
-        if cli_args.verbose:
-            log("Fetching data...")
+        logger.debug("Fetching data...")
         input_data = query_source_api(configuration["input"])
-        if cli_args.verbose:
-            log("Formating data...")
+        logger.debug("Formating data...")
         output_data = format_source_result(input_data)
-        if cli_args.verbose:
-            log("Writing into database...")
+        logger.debug("Writing into database...")
         write_output(configuration["output"], output_data)
-        log("End of declaration data import.")
+        logger.info("End of declaration data import.")
         return 0
     except Exception as exc:
-        exc_type = str(type(exc)).replace("<class '", "").replace("'>", "")
-        log(f"ERROR (main) - {exc_type}:", exc)
+        logger.error(traceback.format_exc())
         return 1
 
 # -- MAIN SCRIPT --
