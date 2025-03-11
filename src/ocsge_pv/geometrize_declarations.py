@@ -111,12 +111,6 @@ def load_configuration(path: Path) -> Dict:
             + " dbname=" + modified_configuration['main_database']['name']
             + " user=" + modified_configuration['main_database']['user']
             + " password=" + modified_configuration['main_database']['password'])
-        modified_configuration["main_database"]["_pg_string"] = (
-            "host=" + modified_configuration['main_database']['host']
-            + " port=" + str(modified_configuration['main_database']['port'])
-            + " dbname=" + modified_configuration['main_database']['name']
-            + " user=" + modified_configuration['main_database']['user']
-            + " password=" + modified_configuration['main_database']['password'])
         modified_configuration["main_database"]["_table_name_raw"] = (
             modified_configuration["main_database"]["schema"] + "."
             + modified_configuration["main_database"]["table"])
@@ -184,8 +178,10 @@ def main() -> None:
         if cli_args.verbose:
             logger.setLevel(logging.DEBUG)
         # Read configuration
+        logger.debug("Loading configuration...")
         configuration = load_configuration(cli_args.path)
         # Connect to OGR datasources
+        logger.debug("Preparing OGR entities...")
         declaration_ogr_ds = ogr.Open(f'PG: {configuration["main_database"]["_pg_string"]}')
         cadastre_ogr_ds = ogr.Open(f'PG: {configuration["cadastre_database"]["_pg_string"]}')
         # Compute SRS and conversions
@@ -216,6 +212,7 @@ def main() -> None:
                 or (is_declaration_srs_latlon and not is_cadastre_srs_latlon)
             )
         # Georeference declarations
+        logger.debug("Computing declarations' geometries...")
         declaration_update_list = []
         for declaration_feature in declaration_ogr_layer:
             try:
@@ -244,6 +241,7 @@ def main() -> None:
                             new_geom = temp_geom
                 declaration_update_list.append((farm_fid, new_geom.ExportToWkt()))
         # Write output
+        logger.debug("Updating geometries in database...")
         declaration_pkey = declaration_ogr_layer.GetFIDColumn()
         write_output(configuration["main_database"], declaration_update_list, declaration_pkey)
         logger.info("End of declaration data geometry edition.")
