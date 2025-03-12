@@ -8,7 +8,7 @@
         "schema": "photovoltaic",
         "tables": {
             "detections": "detection",
-            "declararations": "declaration",
+            "declarations": "declaration",
             "links": "declaration_detection"
         }
     }

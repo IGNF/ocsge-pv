@@ -456,13 +456,13 @@ def main() -> None:
         cli_args = cli_arg_parser()
         if cli_args.verbose:
             logger.setLevel(logging.DEBUG)
-        logger.debug("Loading configuration...")
+        logger.info("Loading configuration...")
         configuration = load_configuration(cli_args.path)
-        logger.debug("Fetching data...")
+        logger.info("Fetching data...")
         input_data = query_source_api(configuration["input"])
-        logger.debug("Formating data...")
+        logger.info("Formating data...")
         output_data = format_source_result(input_data)
-        logger.debug("Writing into database...")
+        logger.info("Writing into database...")
         write_output(configuration["output"], output_data)
         logger.info("End of declaration data import.")
         return 0

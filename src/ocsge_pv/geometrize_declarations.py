@@ -178,10 +178,10 @@ def main() -> None:
         if cli_args.verbose:
             logger.setLevel(logging.DEBUG)
         # Read configuration
-        logger.debug("Loading configuration...")
+        logger.info("Loading configuration...")
         configuration = load_configuration(cli_args.path)
         # Connect to OGR datasources
-        logger.debug("Preparing OGR entities...")
+        logger.info("Preparing OGR entities...")
         declaration_ogr_ds = ogr.Open(f'PG: {configuration["main_database"]["_pg_string"]}')
         cadastre_ogr_ds = ogr.Open(f'PG: {configuration["cadastre_database"]["_pg_string"]}')
         # Compute SRS and conversions
@@ -212,7 +212,7 @@ def main() -> None:
                 or (is_declaration_srs_latlon and not is_cadastre_srs_latlon)
             )
         # Georeference declarations
-        logger.debug("Computing declarations' geometries...")
+        logger.info("Computing declarations' geometries...")
         declaration_update_list = []
         for declaration_feature in declaration_ogr_layer:
             try:
@@ -241,7 +241,7 @@ def main() -> None:
                             new_geom = temp_geom
                 declaration_update_list.append((farm_fid, new_geom.ExportToWkt()))
         # Write output
-        logger.debug("Updating geometries in database...")
+        logger.info("Updating geometries in database...")
         declaration_pkey = declaration_ogr_layer.GetFIDColumn()
         write_output(configuration["main_database"], declaration_update_list, declaration_pkey)
         logger.info("End of declaration data geometry edition.")

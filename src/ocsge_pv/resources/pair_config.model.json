@@ -8,7 +8,7 @@
         "schema": "schema's name",
         "tables": {
             "detections": "detections table's name",
-            "declararations": "declarations table's name",
+            "declarations": "declarations table's name",
             "links": "links table's name"
         }
     }

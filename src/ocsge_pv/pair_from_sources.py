@@ -12,6 +12,7 @@ import json
 import logging
 import os
 from pathlib import Path
+import sys
 import traceback
 from typing import Dict, List, Tuple
 from zoneinfo import ZoneInfo
@@ -24,8 +25,10 @@ from psycopg import sql
 
 # -- GLOBALS --
 NAME = "pair_from_sources"
+TRACE = 5
 logging.basicConfig(level=logging.INFO,
     format="%(asctime)s %(name)s(%(funcName)s) %(levelname)s: %(message)s")
+logging.addLevelName(TRACE, "TRACE")
 logging.captureWarnings(True)
 logger = logging.getLogger(NAME)
 ogr.UseExceptions()
@@ -62,6 +65,11 @@ def cli_arg_parser() -> argparse.Namespace:
         dest="verbose",
         action="store_true",
         help="output more logs"
+    )
+    parser.add_argument("-vv", "--very_verbose",
+        dest="very_verbose",
+        action="store_true",
+        help="output even more logs"
     )
     return parser.parse_args()
 
@@ -107,11 +115,13 @@ def write_output(output_conf: Dict, out_link_list: List[Tuple]) -> None:
         update_list (List[Tuple]): list of (fid, geometry) of declarations to update
         declaration_pkey (str): name of the private key column for declarations
     """
+    new_pairs_count = 0
     with psycopg.connect(output_conf["_pg_string"]) as conn:
         cur = conn.cursor()
         try:
             with conn.transaction():
                 for link_obj in out_link_list:
+                    logger.log(TRACE, f"Treating pair {link_obj}.")
                     # Vérification d'existence du lien
                     cur.execute(
                         sql.SQL(
@@ -119,35 +129,38 @@ def write_output(output_conf: Dict, out_link_list: List[Tuple]) -> None:
                         ).format(
                             table=sql.Identifier(output_conf["schema"],
                                 output_conf["tables"]["links"]),
-                            decl_key=sql.Identifier(out_link_declar_fkey),
-                            dete_key=sql.Identifier(out_link_detect_fkey)
+                            decl_key=sql.Identifier("declaration_id"),
+                            dete_key=sql.Identifier("detection_id")
                         ),
                         (
-                            link_obj[out_link_declar_fkey],
-                            link_obj[out_link_detect_fkey]
+                            link_obj["declaration_id"],
+                            link_obj["detection_id"]
                         )
                     )
                     result = cur.fetchone()
                     # Ajout si inexistant
                     if result is None:
+                        logger.log(TRACE, f"Pair {link_obj} does not exist and will be inserted.")
                         cur.execute(
                             sql.SQL(
                                 "INSERT INTO {table} ({decl_key}, {dete_key}) VALUES (%s, %s)"
                             ).format(
                                 table=sql.Identifier(output_conf["schema"],
                                     output_conf["tables"]["links"]),
-                                decl_key=sql.Identifier(out_link_declar_fkey),
-                                dete_key=sql.Identifier(out_link_detect_fkey)
+                                decl_key=sql.Identifier("declaration_id"),
+                                dete_key=sql.Identifier("detection_id")
                             ),
                             (
-                                link_obj[out_link_declar_fkey],
-                                link_obj[out_link_detect_fkey]
+                                link_obj["declaration_id"],
+                                link_obj["detection_id"]
                             )
                         )
+                        new_pairs_count += 1
         except Exception as exc:
             logger.error(traceback.format_exc())
             conn.rollback()
             raise exc
+    logger.debug(f"{new_pairs_count} new pairs inserted in database.")
 
 # -- MAIN FUNCTION --
 def main() -> None:
@@ -163,42 +176,54 @@ def main() -> None:
     try:
         logger.info("Start of declarations' pairing with detections.")
         cli_args = cli_arg_parser()
-        if cli_args.verbose:
+        log_level_description = "normal"
+        if cli_args.very_verbose:
+            logger.setLevel(logging.getLevelName("TRACE"))
+            log_level_description = "very verbose"
+        elif cli_args.verbose:
             logger.setLevel(logging.DEBUG)
+            log_level_description = "verbose"
+        logger.info(f"Logging level: '{logger.getEffectiveLevel()}' ({log_level_description})")
         # Read configuration
-        logger.debug("Loading configuration...")
+        logger.info("Loading configuration...")
         configuration = load_configuration(cli_args.path)
         # OGR layers and spatial references
-        logger.debug("Preparing OGR entities...")
+        logger.info("Preparing OGR entities...")
         latlon_sr_name_list = ['WGS 84']
         ogr_pg_connection = ogr.Open(("PG: " + configuration["main_database"]["_pg_string"]))
         ## Declarations layer
-        declaration_table = ".".join(configuration["main_database"]["schema"],
-            configuration["main_database"]["tables"]["declararations"])
+        declaration_table = ".".join((configuration["main_database"]["schema"],
+            configuration["main_database"]["tables"]["declarations"]))
         declaration_ogr_layer = ogr_pg_connection.GetLayerByName(declaration_table)
         if declaration_ogr_layer is None:
             raise Exception(f"Declaration layer '{declaration_table}' was not loaded.")
+        logger.log(TRACE,
+            f"FID column for declaration layer: '{declaration_ogr_layer.GetFIDColumn()}'")
         declaration_osr_sr = declaration_ogr_layer.GetSpatialRef()
         if declaration_osr_sr is None:
             raise Exception(
                 f"Spatial reference for declaration layer '{declaration_table}' was not found.")
         is_declaration_sr_latlon = (declaration_osr_sr.EPSGTreatsAsLatLong()
             or declaration_osr_sr.GetName() in latlon_sr_name_list)
+        logger.debug(f"Declarations layer's SRS: {declaration_osr_sr.GetName()}")
         ## Detections layer
-        detection_table = ".".join(configuration["main_database"]["schema"],
-            configuration["main_database"]["tables"]["detections"])
+        detection_table = ".".join((configuration["main_database"]["schema"],
+            configuration["main_database"]["tables"]["detections"]))
         detection_ogr_layer = ogr_pg_connection.GetLayerByName(detection_table)
         if detection_ogr_layer is None:
             raise Exception(f"Detection layer '{detection_table}' was not loaded.")
+        logger.log(TRACE,
+            f"FID column for detection layer: '{detection_ogr_layer.GetFIDColumn()}'")
         detection_osr_sr = detection_ogr_layer.GetSpatialRef()
         if detection_osr_sr is None:
             raise Exception(
                 f"Spatial reference for detection layer '{detection_table}' was not found.")
         is_detection_sr_latlon = (detection_osr_sr.EPSGTreatsAsLatLong()
             or detection_osr_sr.GetName() in latlon_sr_name_list)
+        logger.debug(f"Detections layer's SRS: {detection_osr_sr.GetName()}")
         ## Pairing layer
-        pairing_table = ".".join(configuration["main_database"]["schema"],
-            configuration["main_database"]["tables"]["links"])
+        pairing_table = ".".join((configuration["main_database"]["schema"],
+            configuration["main_database"]["tables"]["links"]))
         pairing_ogr_layer = ogr_pg_connection.GetLayerByName(pairing_table)
         if pairing_ogr_layer is None:
             raise Exception(f"Pairing layer '{pairing_table}' was not loaded.")
@@ -206,15 +231,19 @@ def main() -> None:
         coordinates_transformation = None
         need_coordinates_swap = False # True if the two spatial references use a different axis order
         if detection_osr_sr != declaration_osr_sr:
+            logger.debug("Coordinates transformation is necessary.")
             coordinates_transformation = osr.CoordinateTransformation(
                 declaration_osr_sr, detection_osr_sr)
             need_coordinates_swap = (
                 (is_detection_sr_latlon and not is_declaration_sr_latlon)
                 or (is_declaration_sr_latlon and not is_detection_sr_latlon)
             )
+            if need_coordinates_swap:
+                logger.debug("Axis order swapping is necessary for this transformation.")
         # Data fetching
-        logger.debug("Fetching source data...")
+        logger.info("Fetching source data...")
         ## Declarations (with non-null geometries and installation dates)
+        logger.debug("Fetching declarations with non-null spatial and temproal attributes.")
         declaration_dict = {}
         for farm_feature in declaration_ogr_layer:
             farm_id = farm_feature.GetFID()
@@ -231,7 +260,9 @@ def main() -> None:
                         new_geom.SwapXY()
                     new_geom.Transform(coordinates_transformation)
                     declaration_dict[farm_id]["geom"] = new_geom.Clone()
+        logger.debug(f"{len(declaration_dict)} declarations fetched.")
         ## Detections
+        logger.debug("Fetching detections.")
         detection_dict = {}
         for farm_feature in detection_ogr_layer:
             farm_id = farm_feature.GetFID()
@@ -239,9 +270,10 @@ def main() -> None:
                 "millesime": farm_feature.GetField("millesime"),
             }
             detection_dict[farm_id]["geom"] = farm_feature.geometry().Clone()
+        logger.debug(f"{len(detection_dict)} detections fetched.")
         ogr_pg_connection = None
         # Pairing
-        logger.debug("Computing pairs...")
+        logger.info("Computing pairs...")
         out_link_list = []
         for detection_id in detection_dict.keys():
             for declaration_id in declaration_dict.keys():
@@ -258,10 +290,12 @@ def main() -> None:
                     is_pair = geom_intersect_bool and time_intersect_bool
                     if is_pair:
                         link_obj = {}
-                        link_obj[out_link_declar_fkey] = declaration_id
-                        link_obj[out_link_detect_fkey] = detection_id
+                        link_obj["declaration_id"] = declaration_id
+                        link_obj["detection_id"] = detection_id
                         out_link_list.append(link_obj)
-        logger.debug("Writing pairs in database...")
+        logger.debug(f"{len(out_link_list)} pairs. (Include previously existing pairs.)")
+        ## TODO? check if some previous pairs no longer exist?
+        logger.info("Writing pairs in database...")
         write_output(configuration["main_database"], out_link_list)
         logger.info("End of declarations' pairing with detections.")
         return 0
