@@ -3,9 +3,12 @@
 Import photovoltaic farms declaration files from the official 
 declaration service API, and insert them into a database. 
 
-This script's only argument is the path to a configuration file.
-A model named 'import_declarations_config.ok.json' is available in 
-the 'tests/fixture' folder.
+The only mandatory argument is the path to a JSON configuration file.
+See cli_arg_parser for optionnal arguments.
+Documentation for the configuration file is provided:
+    * annotated schema: 
+        src/ocsge_pv/resources/import_declarations_config.schema.json
+    * example: tests/fixture/import_declarations_config.ok.json
 
 This file contains the following functions :
     * cli_arg_parser - parse CLI arguments
@@ -48,13 +51,6 @@ logging.basicConfig(level=logging.INFO,
 # logging.captureWarnings(True)
 AIOHTTPTransport_logger.setLevel(logging.WARNING)
 logger = logging.getLogger(NAME)
-try:
-    timezone_name = os.environ["TZ"]
-    print(f"Zone horaire définie par VE : '{timezone_name}'")
-except KeyError:
-    timezone_name = "Europe/Paris"
-    print(f"Zone horaire définie par défaut : '{timezone_name}'")
-timezone_info = ZoneInfo(timezone_name)
 
 # -- FUNCTIONS --
 def cli_arg_parser() -> argparse.Namespace:
@@ -441,7 +437,7 @@ def write_output(output_conf: Dict, data: List) -> None:
             raise exc
 
 # -- MAIN FUNCTION --
-def main() -> None:
+def main() -> int:
     """Main routine, entrypoint for the program
         
     Args:

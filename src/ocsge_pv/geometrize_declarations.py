@@ -4,9 +4,12 @@ Compute and add geometries to declared photovoltaic installations.
 Cadastral parcels' geometries are used to determine the complete 
 geometry of a declared installation.
 
-This script's only argument is the path to a configuration file.
-A model named 'geometrize_config.ok.json' is available in 
-the 'tests/fixture' folder.
+The only mandatory argument is the path to a JSON configuration file.
+See cli_arg_parser for optionnal arguments.
+Documentation for the configuration file is provided:
+    * annotated schema:
+        src/ocsge_pv/resources/geometrize_config.schema.json
+    * example: tests/fixture/geometrize_config.ok.json
 
 This file contains the following functions :
     * cli_arg_parser - parse CLI arguments
@@ -46,13 +49,6 @@ logging.captureWarnings(True)
 logger = logging.getLogger(NAME)
 ogr.UseExceptions()
 osr.UseExceptions()
-try:
-    timezone_name = os.environ["TZ"]
-    print(f"Zone horaire définie par VE : '{timezone_name}'")
-except KeyError:
-    timezone_name = "Europe/Paris"
-    print(f"Zone horaire définie par défaut : '{timezone_name}'")
-timezone_info = ZoneInfo(timezone_name)
 
 # -- FUNCTIONS --
 def cli_arg_parser() -> argparse.Namespace:
@@ -67,7 +63,7 @@ def cli_arg_parser() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog=NAME,
         description=(
-            "Ensure that declarations have a geomtry based on intersected cadastral parcels"
+            "Ensure that declarations have a geometry based on intersected cadastral parcels"
         )
     )
     parser.add_argument("path",
@@ -162,7 +158,7 @@ def write_output(output_conf: Dict, update_list: List[Tuple], declaration_pkey: 
             raise exc
 
 # -- MAIN FUNCTION --
-def main() -> None:
+def main() -> int:
     """Main routine, entrypoint for the program
         
     Args:

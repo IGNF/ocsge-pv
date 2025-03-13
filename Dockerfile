@@ -11,6 +11,8 @@ RUN ln -fs "/usr/share/zoneinfo/${TZ}" \
 COPY . /app
 WORKDIR /app
 RUN chown -R ubuntu /app
+ENV HOME="/tmp"
+RUN ln -s /app/src/ocsge_pv/resources $HOME/ocsge-pv-resources
 
 FROM common AS build_environment
 RUN apt update \
@@ -32,6 +34,7 @@ RUN python3 -m pip install "gdal==$(gdal-config --version)" ./dist/*.whl
 
 FROM common AS run_environment
 COPY --from=install_environment /app/venv /app/venv
+COPY --from=common /app/src/ocsge_pv/resources $HOME/
 ENV PATH="/app/venv/bin:$PATH"
 
-CMD ["bash"]
+CMD ["ocsge-pv-help"]
