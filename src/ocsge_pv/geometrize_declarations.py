@@ -31,7 +31,6 @@ import re
 import sys
 import traceback
 from typing import Dict, List, Tuple
-from zoneinfo import ZoneInfo
 
 # 3rd party
 from osgeo import ogr, osr

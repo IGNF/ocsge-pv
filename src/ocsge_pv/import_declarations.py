@@ -33,7 +33,6 @@ import re
 import sys
 import traceback
 from typing import Dict, List
-from zoneinfo import ZoneInfo
 
 # 3rd party
 from gql import gql, Client
