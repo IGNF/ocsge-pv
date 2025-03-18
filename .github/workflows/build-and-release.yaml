@@ -6,28 +6,73 @@ on:
       - '[0-9]+.[0-9]+.[0-9]+'
       - '[0-9]+.[0-9]+.[0-9]+b[0-9]+'
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
 jobs:
 
   create_release:
     name: Create Release
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
       job_status: ${{ job.status }}
     steps:
       - name: Checkout project
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
       - name: Create Release
         id: create_release
-        uses: ncipollo/release-action@v1
+        uses: ncipollo/release-action@440c8c1cb0ed28b9f43e4d1d670870f059653174
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
           generateReleaseNotes: true
           draft: false
           prerelease: ${{ contains(github.ref_name ,'b') }}
+
+  build_and_publish_docker:
+    name: Build docker image and push it to github repository
+    outputs:
+      job_status: ${{ job.status }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      
+      - name: Log in to GitHub Container Repository
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare Docker metadata
+        id: docker_mtd
+        uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804
+        with:
+          images: ${{ env.REGISTRY }/${{ env.IMAGE_NAME }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        id: docker_push
+        uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.docker_mtd.outputs.tags }}
+          labels: ${{ steps.docker_mtd.outputs.labels }}
+      
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}
+          subject-digest: ${{ steps.docker_push.outputs.digest }}
+          push-to-registry: true
+
 
   build_and_test:
 
@@ -42,6 +87,8 @@ jobs:
         include:
           - os: ubuntu-24.04
             python-version: "3.12"
+          - os: ubuntu-22.04
+            python-version: "3.11"
 
     runs-on: ${{ matrix.os }}
 
@@ -129,6 +176,7 @@ jobs:
           cd target/
           mike deploy --push --update-aliases --branch gh-pages -t "Version ${{ github.ref_name }}" ${{ github.ref_name }} latest
           mike set-default --push --branch gh-pages ${{ github.ref_name }}
+
 
   delete_version:
     name: Remove release and tag if error occured
