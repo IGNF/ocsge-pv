@@ -11,7 +11,7 @@ license = {file = "LICENSE.md"}
 keywords = ["aggregation", "OCSGE", "photovoltaic"]
 
 authors = [
-  {name = "Géoportail Developer", email = "tout_rdev@ign.fr" }
+  {name = "Géoplateforme IGN developers", email = "tout_rde@ign.fr" }
 ]
 
 classifiers = [
@@ -37,7 +37,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-doc = []
+doc = [
+  "pdoc"
+]
 
 dev = [
   "black",

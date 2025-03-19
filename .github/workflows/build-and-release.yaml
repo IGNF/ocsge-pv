@@ -11,7 +11,6 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-
   create_release:
     name: Create Release
     runs-on: ubuntu-24.04
@@ -32,50 +31,8 @@ jobs:
           draft: false
           prerelease: ${{ contains(github.ref_name ,'b') }}
 
-  build_and_publish_docker:
-    name: Build docker image and push it to github repository
-    outputs:
-      job_status: ${{ job.status }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout project
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      
-      - name: Log in to GitHub Container Repository
-        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Prepare Docker metadata
-        id: docker_mtd
-        uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804
-        with:
-          images: ${{ env.REGISTRY }/${{ env.IMAGE_NAME }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build and push Docker image
-        id: docker_push
-        uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.docker_mtd.outputs.tags }}
-          labels: ${{ steps.docker_mtd.outputs.labels }}
-      
-      - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2
-        with:
-          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}
-          subject-digest: ${{ steps.docker_push.outputs.digest }}
-          push-to-registry: true
-
 
   build_and_test:
-
     name: Test and build artefacts
     needs: create_release
     outputs:
@@ -89,9 +46,9 @@ jobs:
             python-version: "3.12"
           - os: ubuntu-22.04
             python-version: "3.11"
-
+          - os: ubuntu-22.04
+            python-version: "3.10"
     runs-on: ${{ matrix.os }}
-
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
@@ -108,13 +65,13 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt update
-          sudo apt -y install python3-gdal
+          sudo apt -y install python3-gdal libgdal-dev
 
       - name: Install python dependencies
         run: |
           python3 -m venv .venv
           source .venv/bin/activate
-          python3 -m pip install --upgrade build bump2version
+          python3 -m pip install --upgrade build bump2version "gdal==$(gdal-config --version)"
           bump2version --current-version 0.0.0 --new-version ${{ github.ref_name }} patch
           pip install -e .
 
@@ -143,19 +100,7 @@ jobs:
         run: |
           source .venv/bin/activate
           pip install -e .[doc]
-          pdoc3 --html --output-dir target/docs/ rok4_tools
-          cp docs/mkdocs.yml target/mkdocs.yml
-          cp -r docs/overrides target/
-          cp -r docs/images target/docs/
-          cp docs/unit-tests.md target/docs/unit-tests.md
-          cp docs/documentation.md target/docs/documentation.md
-          cp docs/README.hdr.md target/docs/README.md
-          cp docs/CHANGELOG.hdr.md target/docs/CHANGELOG.md
-          cp docs/CONTRIBUTING.hdr.md target/docs/CONTRIBUTING.md
-          sed "s#x.y.z#${{ github.ref_name }}#g" README.md >>target/docs/README.md
-          sed -i "s#](./docs/images/#](./images/#g" target/docs/README.md
-          cat CHANGELOG.md >>target/docs/CHANGELOG.md
-          cat CONTRIBUTING.md >>target/docs/CONTRIBUTING.md
+          pdoc -d google -o target/docs/ ocsge_pv
 
       - name: Upload packages
         if: "matrix.os == 'ubuntu-24.04' && matrix.python-version == '3.12'"
@@ -176,6 +121,52 @@ jobs:
           cd target/
           mike deploy --push --update-aliases --branch gh-pages -t "Version ${{ github.ref_name }}" ${{ github.ref_name }} latest
           mike set-default --push --branch gh-pages ${{ github.ref_name }}
+
+  build_and_publish_docker:
+    name: Build docker image and push it to github repository
+    needs: build_and_test
+    if: "always() && needs.create_release.outputs.job_status == 'success' && needs.build_and_test.outputs.job_status == 'success'"
+    outputs:
+      job_status: ${{ job.status }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      
+      - name: Log in to GitHub Container Repository
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare Docker metadata
+        id: docker_mtd
+        uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804
+        with:
+          images: ${{ env.REGISTRY }/${{ env.IMAGE_NAME }}
+          labels:
+            org.opencontainers.image.vendor=IGN (Institut national de l’information géographique et forestière) (https://www.ign.fr)
+            org.opencontainers.image.base.name=docker.io/library/ubuntu:24.04
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        id: docker_push
+        uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.docker_mtd.outputs.tags }}
+          labels: ${{ steps.docker_mtd.outputs.labels }}
+      
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}
+          subject-digest: ${{ steps.docker_push.outputs.digest }}
+          push-to-registry: true
 
 
   delete_version:
