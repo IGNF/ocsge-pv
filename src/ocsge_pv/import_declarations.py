@@ -126,7 +126,7 @@ def format_feature(in_data: Dict) -> Dict:
     if in_data is not None:
         dossier_number = in_data["number"]
         out_data["id_dossier"] = dossier_number
-        out_data["last_update"] = datetime.fromisoformat(in_data["dateDerniereModification"])
+        out_data["dern_modif"] = datetime.fromisoformat(in_data["dateDerniereModification"])
         parcels_list = []
         contains_raw_geometry = False
         for champ in in_data["champs"]:
