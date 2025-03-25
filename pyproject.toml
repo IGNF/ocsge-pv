@@ -30,7 +30,7 @@ classifiers = [
 ]
 
 dependencies = [
-  "GDAL >= 3.6.2",
+  # "GDAL >= 3.6.2",
   "gql[aiohttp]",
   "psycopg",
   "jsonschema >= 4.23.0"
