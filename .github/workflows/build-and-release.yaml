@@ -75,6 +75,8 @@ jobs:
 
       - name: Run unit tests
         run: |
+          sudo mkdir -p /app
+          sudo ln -s ./tests /app/tests
           source .venv/bin/activate
           pip install -e .[test]
           coverage run -m pytest
