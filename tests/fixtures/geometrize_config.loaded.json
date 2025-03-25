@@ -8,8 +8,7 @@
         "schema": "photovoltaic",
         "table": "declaration",
         "_pg_string": "host=192.168.0.1 port=5432 dbname=ocsge user=data_producer password=bip-boop-123456",
-        "_table_name_raw": "photovoltaic.declaration",
-        "_table_name_sql": "SQL('photovoltaic'.'declaration')"
+        "_table_name_raw": "photovoltaic.declaration"
     },
     "cadastre_database": {
         "host": "localhost",

@@ -4,6 +4,9 @@ Establishes links between declaration data and remote detection data
 when they match a same photovoltaic installation.
 
 The only mandatory argument is the path to a JSON configuration file.
+The environment variable OCSGE_PV_RESOURCE_DIR describes the path to
+<repo>/src/ocsge_pv/resources or a copy of this directory. If empty or
+unset, /app/src/ocsge_pv/resources will be used instead.
 See cli_arg_parser for optionnal arguments.
 Documentation for the configuration file is provided:
     * annotated schema: src/ocsge_pv/resources/pair_config.schema.json
@@ -85,14 +88,17 @@ def load_configuration(path: Path) -> Dict:
         path (str): path to the configuration file
     
     Raises:
-        jonschema.ValidationError: The configuration file does not match the validation schema
+        jonschema.ValidationError: The configuration file does not
+            match the validation schema
 
     Returns:
         Dict: the configuration object translated from the input file
     """
     try:
-        validation_schema_path = Path(os.environ["HOME"],
-            "ocsge-pv-resources/pair_config.schema.json")
+        resource_dir = os.environ.get("OCSGE_PV_RESOURCE_DIR")
+        if resource_dir is None or resource_dir.strip() == "":
+            resource_dir = "/app/src/ocsge_pv/resources"
+        validation_schema_path = Path(resource_dir, "pair_config.schema.json")
         with open(path, "r", encoding="utf-8") as config_file:
             config_str = config_file.read()
         source_configuration = json.loads(config_str)

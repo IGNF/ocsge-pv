@@ -7,12 +7,12 @@
         "password": "bip-boop-123456",
         "schema": "photovoltaic",
         "table": "declaration",
-        "_pg_string": "host=192.168.0.1 port=5432 dbname=ocsge user=data_producer password=bip-boop-123456",
-        "_table_name_sql": "SQL('photovoltaic'.'declaration')"
+        "_pg_string": "host=192.168.0.1 port=5432 dbname=ocsge user=data_producer password=bip-boop-123456"
     },
     "input": {
         "api_url": "https://www.demarches-simplifiees.fr/api/v2/graphql",
         "auth_token": "A9Knc34tP==",
-        "demarche_id": 1546
+        "demarche_id": 1546,
+        "min_update_datetime": "2025-02-13T11:56:54.950481+01:00"
     }
 }

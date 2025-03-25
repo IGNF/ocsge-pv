@@ -8,6 +8,8 @@ Each variable prefixed by "f_" is a fixture.
 
 from copy import deepcopy
 import json
+from pathlib import Path
+import os
 import re
 from unittest import TestCase, mock, skip
 from unittest.mock import MagicMock, call, mock_open, patch
@@ -56,10 +58,12 @@ class TestConfigurationValidationSchema(TestCase):
 class TestConfigurationLoader(TestCase):
     """Tests the configuration loader."""
     def setUp(self):
+        self.env_copy = deepcopy(os.environ)
+        self.env_copy["OCSGE_PV_RESOURCE_DIR"] = os.environ["HOME"].rstrip("/") + "/ocsge-pv-resources"
         # Fixtures
         ## Configuration file path
-        self.f_config_ok_path = "tests/fixtures/import_declarations_config.ok.json"
-        self.f_config_nok_path = "tests/fixtures/import_declarations_config.nok.json"
+        self.f_config_ok_path = Path("/app/tests/fixtures/import_declarations_config.ok.json")
+        self.f_config_nok_path = Path("/app/tests/fixtures/import_declarations_config.nok.json")
         ## Configuration file, nominal
         self.f_config_ok_raw = ""
         with open(self.f_config_ok_path, "r", encoding="utf-8") as file:
@@ -67,7 +71,7 @@ class TestConfigurationLoader(TestCase):
         ## Configuration object, nominal before validation
         self.f_config_ok_obj = json.loads(self.f_config_ok_raw)
         ## Configuration object, nominal after complete load
-        f_config_loaded_path = "tests/fixtures/import_declarations_config.loaded.json"
+        f_config_loaded_path = Path("/app/tests/fixtures/import_declarations_config.loaded.json")
         with open(f_config_loaded_path, "r", encoding="utf-8") as file:
             f_config_loaded_raw = file.read()
         self.f_config_loaded_obj = json.loads(f_config_loaded_raw)
@@ -79,7 +83,8 @@ class TestConfigurationLoader(TestCase):
         self.f_config_nok_obj = json.loads(self.f_config_nok_raw)
 
         ## Configuration file path
-        self.f_config_schema_path = "src/ocsge_pv/resources/import_declarations_config.schema.json"
+        self.f_config_schema_path = Path(self.env_copy["OCSGE_PV_RESOURCE_DIR"],
+            "import_declarations_config.schema.json")
         ## Configuration file, nominal
         self.f_config_schema_raw = ""
         with open(self.f_config_schema_path, "r", encoding="utf-8") as file:
@@ -96,11 +101,9 @@ class TestConfigurationLoader(TestCase):
             mock_open(read_data=self.f_config_schema_raw).return_value
         ]
         expected_result = deepcopy(self.f_config_loaded_obj)
-        expected_result["output"]["_table_name_sql"] = sql.SQL(".").join([
-            expected_result["output"]["schema"],
-            expected_result["output"]["table"]])
         # Call to the tested function
-        result = load_configuration(self.f_config_ok_path)
+        with patch.dict(os.environ, self.env_copy):
+            result = load_configuration(self.f_config_ok_path)
         # Assertions
         m_open.assert_called()
         m_open.assert_has_calls([
@@ -119,8 +122,9 @@ class TestConfigurationLoader(TestCase):
             mock_open(read_data=self.f_config_schema_raw).return_value
         ]
         # Call to the tested function (while asserting Exception)
-        with self.assertRaises(ValidationError):
-            result = load_configuration(self.f_config_nok_path)
+        with patch.dict(os.environ, self.env_copy):
+            with self.assertRaises(ValidationError):
+                result = load_configuration(self.f_config_nok_path)
         # Assertions
         m_open.assert_called()
         m_open.assert_has_calls([
