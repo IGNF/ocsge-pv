@@ -129,7 +129,7 @@ jobs:
         id: docker_mtd
         uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804
         with:
-          images: ${{ env.REGISTRY }/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           labels:
             org.opencontainers.image.vendor=IGN (Institut national de l’information géographique et forestière) (https://www.ign.fr)
             org.opencontainers.image.base.name=docker.io/library/ubuntu:24.04
