@@ -75,8 +75,8 @@ jobs:
 
       - name: Run unit tests
         run: |
-          sudo mkdir -p /app
-          sudo ln -s ./tests /app/tests
+          export OCSGE_PV_FIXTURE_DIR=$(realpath ./tests/fixtures)
+          export OCSGE_PV_RESOURCE_DIR=$(realpath ./src/ocsge_pv/resources)
           source .venv/bin/activate
           pip install -e .[test]
           coverage run -m pytest

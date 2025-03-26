@@ -24,13 +24,22 @@ from ocsge_pv.geometrize_declarations import (
     write_output
 )
 
+try:
+    OCSGE_PV_FIXTURE_DIR = Path(os.environ.get("OCSGE_PV_FIXTURE_DIR").strip()).resolve()
+except:
+    OCSGE_PV_FIXTURE_DIR = Path(".", "tests/fixtures").resolve()
+try:
+    OCSGE_PV_RESOURCE_DIR = Path(os.environ.get("OCSGE_PV_RESOURCE_DIR").strip()).resolve()
+except:
+    OCSGE_PV_RESOURCE_DIR = Path(".", "src/ocsge_pv/resources").resolve()
+
 #Tests
 class TestConfigurationValidationSchema(TestCase):
     """Tests the configuration validation schema itself."""
     def setUp(self):
-        self.schema_path = "src/ocsge_pv/resources/geometrize_config.schema.json"
-        self.f_config_ok_path = "tests/fixtures/geometrize_config.ok.json"
-        self.f_config_nok_path = "tests/fixtures/geometrize_config.nok.json"
+        self.schema_path = f"{OCSGE_PV_RESOURCE_DIR}/geometrize_config.schema.json"
+        self.f_config_ok_path = f"{OCSGE_PV_FIXTURE_DIR}/geometrize_config.ok.json"
+        self.f_config_nok_path = f"{OCSGE_PV_FIXTURE_DIR}/geometrize_config.nok.json"
         with open(self.schema_path, "r", encoding="utf-8") as fp:
             self.schema = json.load(fp)
 
@@ -56,11 +65,11 @@ class TestConfigurationLoader(TestCase):
     """Tests the configuration loader."""
     def setUp(self):
         self.env_copy = deepcopy(os.environ)
-        self.env_copy["OCSGE_PV_RESOURCE_DIR"] = os.environ["HOME"].rstrip("/") + "/ocsge-pv-resources"
+        self.env_copy["OCSGE_PV_RESOURCE_DIR"] = str(OCSGE_PV_RESOURCE_DIR)
         # Fixtures
         ## Configuration file path
-        self.f_config_ok_path = Path("/app/tests/fixtures/geometrize_config.ok.json")
-        self.f_config_nok_path = Path("/app/tests/fixtures/geometrize_config.nok.json")
+        self.f_config_ok_path = Path(OCSGE_PV_FIXTURE_DIR, "geometrize_config.ok.json")
+        self.f_config_nok_path = Path(OCSGE_PV_FIXTURE_DIR, "geometrize_config.nok.json")
         ## Configuration file, nominal
         self.f_config_ok_raw = ""
         with open(self.f_config_ok_path, "r", encoding="utf-8") as file:
@@ -68,7 +77,7 @@ class TestConfigurationLoader(TestCase):
         ## Configuration object, nominal before validation
         self.f_config_ok_obj = json.loads(self.f_config_ok_raw)
         ## Configuration object, nominal after complete load
-        f_config_loaded_path = Path("/app/tests/fixtures/geometrize_config.loaded.json")
+        f_config_loaded_path = Path(OCSGE_PV_FIXTURE_DIR, "geometrize_config.loaded.json")
         with open(f_config_loaded_path, "r", encoding="utf-8") as file:
             f_config_loaded_raw = file.read()
         self.f_config_loaded_obj = json.loads(f_config_loaded_raw)
@@ -80,7 +89,7 @@ class TestConfigurationLoader(TestCase):
         self.f_config_nok_obj = json.loads(self.f_config_nok_raw)
 
         ## Configuration file path
-        self.f_config_schema_path = Path(self.env_copy["OCSGE_PV_RESOURCE_DIR"],
+        self.f_config_schema_path = Path(OCSGE_PV_RESOURCE_DIR,
             "geometrize_config.schema.json")
         ## Configuration file, nominal
         self.f_config_schema_raw = ""
@@ -132,7 +141,7 @@ class TestConfigurationLoader(TestCase):
 class TestWriter(TestCase):
     """Tests the output writing routine."""
     def setUp(self):
-        f_config_loaded_path = Path("/app/tests/fixtures/geometrize_config.loaded.json")
+        f_config_loaded_path = Path(OCSGE_PV_FIXTURE_DIR, "geometrize_config.loaded.json")
         with open(f_config_loaded_path, "r", encoding="utf-8") as file:
             f_config_loaded_raw = file.read()
         self.f_configuration = json.loads(f_config_loaded_raw)
@@ -144,7 +153,7 @@ class TestWriter(TestCase):
     @patch("psycopg.connect")
     def test_ok(self, m_psycopg_connect):
         # Preparation
-        f_config_loaded_path = Path("/app/tests/fixtures/geometrize_config.loaded.json")
+        f_config_loaded_path = Path(OCSGE_PV_FIXTURE_DIR, "geometrize_config.loaded.json")
         with open(f_config_loaded_path, "r", encoding="utf-8") as file:
             f_config_loaded_raw = file.read()
         f_configuration = json.loads(f_config_loaded_raw)

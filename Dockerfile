@@ -9,6 +9,8 @@ RUN ln -fs "/usr/share/zoneinfo/${TZ}" \
 && apt -y autoremove --purge \
 && apt -y clean
 COPY . /app
+ENV OCSGE_PV_FIXTURE_DIR="/app/tests/fixtures"
+ENV OCSGE_PV_RESOURCE_DIR="/app/src/ocsge_pv/resources"
 WORKDIR /app
 RUN chown -R ubuntu /app
 ENV HOME="/tmp"
@@ -33,8 +35,11 @@ ENV PATH="/app/venv/bin:$PATH"
 RUN python3 -m pip install "gdal==$(gdal-config --version)" ./dist/*.whl
 
 FROM common AS run_environment
+USER ubuntu
+ENV HOME="/home/ubuntu"
 COPY --from=install_environment /app/venv /app/venv
-COPY --from=common /app/src/ocsge_pv/resources $HOME/
+COPY --from=common /app/src/ocsge_pv/resources $HOME/resources
+ENV OCSGE_PV_RESOURCE_DIR="$HOME/resources"
 ENV PATH="/app/venv/bin:$PATH"
 
 CMD ["ocsge-pv-help"]
