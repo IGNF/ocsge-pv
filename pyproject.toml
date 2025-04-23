@@ -6,7 +6,7 @@ version = "0.0.0"
 description = "Python tools for generation of the photovoltaic data used in OCSGE from IGN France"
 readme = "README.md"
 requires-python = ">=3.10"
-license = {file = "LICENSE.md"}
+license-files = ["LICEN[CS]E.*"]
 
 keywords = ["aggregation", "OCSGE", "photovoltaic"]
 
@@ -19,8 +19,6 @@ classifiers = [
   "Development Status :: 3 - Alpha",
 
   "Topic :: Software Development",
-
-  "License :: MIT",
 
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.10",
