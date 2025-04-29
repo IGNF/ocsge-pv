@@ -31,12 +31,12 @@
                 "name": {
                     "description": "Database's name on the host server",
                     "type": "string",
-                    "pattern": "^[a-z_]+$"
+                    "pattern": "^[a-zA-_][a-zA-Z0-9_]+$|^\".*\"$"
                 },
                 "user": {
                     "description": "User's name",
                     "type": "string",
-                    "pattern": "^[a-z_]+$"
+                    "pattern": "^[a-zA-_][a-zA-Z0-9_]+$|^\".*\"$"
                 },
                 "password": {
                     "description": "User's password",
@@ -45,12 +45,12 @@
                 "schema": {
                     "description": "Name of the schema",
                     "type": "string",
-                    "pattern": "^[0-9a-z_]+$"
+                    "pattern": "^[a-zA-_][a-zA-Z0-9_]+$|^\".*\"$"
                 },
                 "table": {
                     "description": "Name of the table",
                     "type": "string",
-                    "pattern": "^[0-9a-z_]+$"
+                    "pattern": "^[a-zA-_][a-zA-Z0-9_]+$|^\".*\"$"
                 }
             },
             "additionalProperties": false,
@@ -90,12 +90,12 @@
                 "name": {
                     "description": "Database's name on the host server",
                     "type": "string",
-                    "pattern": "^[a-z_]+$"
+                    "pattern": "^[a-zA-_][a-zA-Z0-9_]+$|^\".*\"$"
                 },
                 "user": {
                     "description": "User's name",
                     "type": "string",
-                    "pattern": "^[a-z_]+$"
+                    "pattern": "^[a-zA-_][a-zA-Z0-9_]+$|^\".*\"$"
                 },
                 "password": {
                     "description": "User's password",
@@ -104,12 +104,12 @@
                 "schema": {
                     "description": "Name of the schema",
                     "type": "string",
-                    "pattern": "^[0-9a-z_]+$"
+                    "pattern": "^[a-zA-_][a-zA-Z0-9_]+$|^\".*\"$"
                 },
                 "table": {
                     "description": "Name of the table",
                     "type": "string",
-                    "pattern": "^[0-9a-z_]+$"
+                    "pattern": "^[a-zA-_][a-zA-Z0-9_]+$|^\".*\"$"
                 }
             },
             "additionalProperties": false,
