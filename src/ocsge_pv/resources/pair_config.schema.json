@@ -31,12 +31,12 @@
                 "name": {
                     "description": "Database's name on the host server",
                     "type": "string",
-                    "pattern": "^[a-z_]+$"
+                    "pattern": "^[a-zA-_][a-zA-Z0-9_]+$|^\".*\"$"
                 },
                 "user": {
                     "description": "User's name",
                     "type": "string",
-                    "pattern": "^[a-z_]+$"
+                    "pattern": "^[a-zA-_][a-zA-Z0-9_]+$|^\".*\"$"
                 },
                 "password": {
                     "description": "User's password",
@@ -45,7 +45,7 @@
                 "schema": {
                     "description": "Name of the schema",
                     "type": "string",
-                    "pattern": "^[0-9a-z_]+$"
+                    "pattern": "^[a-zA-_][a-zA-Z0-9_]+$|^\".*\"$"
                 },
                 "tables": {
                     "description": "Name of the tables",
@@ -54,17 +54,17 @@
                         "detections": {
                             "description": "Table: Detected photovoltaic installations",
                             "type": "string",
-                            "pattern": "^[0-9a-z_]+$"
+                            "pattern": "^[a-zA-_][a-zA-Z0-9_]+$|^\".*\"$"
                         },
                         "declarations": {
                             "description": "Table: Declared photovoltaic installations",
                             "type": "string",
-                            "pattern": "^[0-9a-z_]+$"
+                            "pattern": "^[a-zA-_][a-zA-Z0-9_]+$|^\".*\"$"
                         },
                         "links": {
                             "description": "Table: Links pairing entries from the other tables, when describing a same installation",
                             "type": "string",
-                            "pattern": "^[0-9a-z_]+$"
+                            "pattern": "^[a-zA-_][a-zA-Z0-9_]+$|^\".*\"$"
                         }
                     },
                     "additionalProperties": false,
