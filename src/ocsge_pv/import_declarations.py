@@ -1,7 +1,7 @@
 """Photovoltaic farm declarations importer
 
-Import photovoltaic farms declaration files from the official 
-declaration service API, and insert them into a database. 
+Import photovoltaic farms declaration files from the official
+declaration service API, and insert them into a database.
 
 The only mandatory argument is the path to a JSON configuration file.
 The environment variable OCSGE_PV_RESOURCE_DIR describes the path to
@@ -9,7 +9,7 @@ The environment variable OCSGE_PV_RESOURCE_DIR describes the path to
 unset, /app/src/ocsge_pv/resources will be used instead.
 See cli_arg_parser for optionnal arguments.
 Documentation for the configuration file is provided:
-    * annotated schema: 
+    * annotated schema:
         src/ocsge_pv/resources/import_declarations_config.schema.json
     * example: tests/fixture/import_declarations_config.ok.json
 
@@ -26,33 +26,42 @@ This file contains the following functions :
 # -- IMPORTS --
 # standard library
 import argparse
-from copy import deepcopy
-from datetime import date, datetime
 import json
 import logging
 import os
-from pathlib import Path
 import re
 import sys
 import traceback
-from typing import Dict, List
+from copy import deepcopy
+from datetime import date, datetime
+from pathlib import Path
 
-# 3rd party
-from gql import gql, Client
-from gql.transport.aiohttp import AIOHTTPTransport, log as AIOHTTPTransport_logger
 import jsonschema
 import psycopg
+
+# 3rd party
+from gql import Client, gql
+from gql.transport.aiohttp import AIOHTTPTransport
+from gql.transport.aiohttp import log as AIOHTTPTransport_logger
+from osgeo import ogr, osr
 from psycopg import sql
 
 # package
 
 # -- GLOBALS --
 NAME = "import_declarations"
-logging.basicConfig(level=logging.INFO,
-    format="%(asctime)s %(name)s\(%(funcName)s\) %(levelname)s: %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format=r"%(asctime)s %(name)s\(%(funcName)s\) %(levelname)s: %(message)s"
+)
 # logging.captureWarnings(True)
 AIOHTTPTransport_logger.setLevel(logging.WARNING)
 logger = logging.getLogger(NAME)
+ogr.UseExceptions()
+osr.UseExceptions()
+SOURCE_SRID = 4326
+SOURCE_SRS = osr.SpatialReference()
+SOURCE_SRS.ImportFromEPSG(SOURCE_SRID)  # Axes order: (latitude, longitude)
+
 
 # -- FUNCTIONS --
 def cli_arg_parser() -> argparse.Namespace:
@@ -66,21 +75,19 @@ def cli_arg_parser() -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(
         prog=NAME,
-        description=("Import photovoltaic farms declaration files from the official declaration"
-            + " service API, and insert them into a database.")
+        description=(
+            "Import photovoltaic farms declaration files from the official declaration"
+            + " service API, and insert them into a database."
+        ),
     )
-    parser.add_argument("path",
-        type=Path,
-        help="the path of the configuration file for %(prog)s"
-    )
-    parser.add_argument("-v", "--verbose",
-        dest="verbose",
-        action="store_true",
-        help="output more logs"
+    parser.add_argument("path", type=Path, help="the path of the configuration file for %(prog)s")
+    parser.add_argument(
+        "-v", "--verbose", dest="verbose", action="store_true", help="output more logs"
     )
     return parser.parse_args()
 
-def format_feature(in_data: Dict) -> Dict:
+
+def format_feature(in_data: dict) -> dict:
     """Transform declaration dossier to postgis feature
 
     Args:
@@ -135,20 +142,36 @@ def format_feature(in_data: Dict) -> Dict:
         for champ in in_data["champs"]:
             field_name = ""
             try:
-                if re.search(r"^Cas particulier des projets en période transitoire +:", champ["label"]) is not None:#
+                if (
+                    re.search(
+                        r"^Cas particulier des projets en période transitoire +:", champ["label"]
+                    )
+                    is not None
+                ):  #
                     field_name = "transit"
                     out_data[field_name] = bool(champ["checked"])
-                elif re.search(
+                elif (
+                    re.search(
                         r"mon projet se situe dans la période des mesures transitoires et qu'il remplit l'ensemble des conditions",
-                        champ["label"]) is not None:
+                        champ["label"],
+                    )
+                    is not None
+                ):
                     field_name = "ex_date"
                     out_data[field_name] = bool(champ["checked"])
-                elif re.search(r"^Cas particulier des projets agrivoltaïques +:", champ["label"]) is not None:#
+                elif (
+                    re.search(r"^Cas particulier des projets agrivoltaïques +:", champ["label"])
+                    is not None
+                ):  #
                     field_name = "agrivolt"
                     out_data[field_name] = bool(champ["checked"])
-                elif re.search(
+                elif (
+                    re.search(
                         r"mon projet est une installation agrivoltaïque qui remplit l'ensemble de critères de la question précédente",
-                        champ["label"]) is not None:
+                        champ["label"],
+                    )
+                    is not None
+                ):
                     field_name = "ex_agriv"
                     out_data[field_name] = bool(champ["checked"])
                 elif re.search(r"^Etes-vous le porteur de projet", champ["label"]) is not None:
@@ -157,25 +180,43 @@ def format_feature(in_data: Dict) -> Dict:
                 elif re.search(r"SIRET du porteur", champ["label"]) is not None:
                     field_name = "siret_port"
                     out_data[field_name] = str(champ["stringValue"])
-                elif re.search(r"référence de l'autorisation d'urbanisme", champ["label"]) is not None:
+                elif (
+                    re.search(r"référence de l'autorisation d'urbanisme", champ["label"])
+                    is not None
+                ):
                     field_name = "ref_urba"
                     out_data[field_name] = str(champ["stringValue"])
                 elif re.search(r"type de projet principal", champ["label"]) is not None:
                     field_name = "type_proj"
                     out_data[field_name] = str(champ["stringValue"])
-                elif re.search(r"installations de type trackers.*surface du socle béton", champ["label"]) is not None:
+                elif (
+                    re.search(
+                        r"installations de type trackers.*surface du socle béton", champ["label"]
+                    )
+                    is not None
+                ):
                     field_name = "surf_socle"
-                    out_data[field_name] = float(champ["decimalNumber"]) 
+                    out_data[field_name] = float(champ["decimalNumber"])
                 elif re.search(r"avancement du projet", champ["label"]) is not None:
                     field_name = "etat"
                     out_data[field_name] = str(champ["stringValue"])
                 elif re.search(r"puissance crête maximum", champ["label"]) is not None:
                     field_name = "puiss_max"
                     out_data[field_name] = int(champ["integerNumber"])
-                elif re.search(r"date du dépôt de la demande d'autorisation d'urbanisme", champ["label"]) is not None:
+                elif (
+                    re.search(
+                        r"date du dépôt de la demande d'autorisation d'urbanisme", champ["label"]
+                    )
+                    is not None
+                ):
                     field_name = "date_depot"
                     out_data[field_name] = date.fromisoformat(champ["date"])
-                elif re.search(r"date à laquelle l'autorisation d'urbanisme a été délivrée", champ["label"]) is not None:
+                elif (
+                    re.search(
+                        r"date à laquelle l'autorisation d'urbanisme a été délivrée", champ["label"]
+                    )
+                    is not None
+                ):
                     field_name = "date_deliv"
                     out_data[field_name] = date.fromisoformat(champ["date"])
                 elif re.search(r"date d'installation effective", champ["label"]) is not None:
@@ -202,7 +243,10 @@ def format_feature(in_data: Dict) -> Dict:
                     if champ["secondaryValue"]:
                         field_name = "sol_detail"
                         out_data[field_name] = str(champ["secondaryValue"])
-                elif re.search(r"type d’usage actuel du terrain d’implantation", champ["label"]) is not None:
+                elif (
+                    re.search(r"type d’usage actuel du terrain d’implantation", champ["label"])
+                    is not None
+                ):
                     field_name = "usage_terr"
                     out_data[field_name] = str(champ["stringValue"])
                 elif re.search(r"type d’activité agricole", champ["label"]) is not None:
@@ -214,7 +258,10 @@ def format_feature(in_data: Dict) -> Dict:
                 elif re.search(r"production agricole résiduelle", champ["label"]) is not None:
                     field_name = "agri_resid"
                     out_data[field_name] = str(champ["stringValue"])
-                elif re.search(r"ancrage au sol.*avec des pieux en bois ou en métal", champ["label"]) is not None:
+                elif (
+                    re.search(r"ancrage au sol.*avec des pieux en bois ou en métal", champ["label"])
+                    is not None
+                ):
                     field_name = "nat_pieux"
                     out_data[field_name] = bool(champ["checked"])
                 elif re.search(r"type d'ancrage au sol", champ["label"]) is not None:
@@ -232,23 +279,44 @@ def format_feature(in_data: Dict) -> Dict:
                 elif re.search(r"espacement entre deux rangées", champ["label"]) is not None:
                     field_name = "espacement"
                     out_data[field_name] = float(champ["decimalNumber"])
-                elif re.search(r"^Les caractéristiques techniques de mon installation ne répondent pas aux critères", champ["label"]) is not None:
+                elif (
+                    re.search(
+                        r"^Les caractéristiques techniques de mon installation ne répondent pas aux critères",
+                        champ["label"],
+                    )
+                    is not None
+                ):
                     field_name = "ex_techniq"
-                    out_data[field_name] = (not bool(champ["checked"]))
-                elif re.search(r"^Les caractéristiques techniques de mon installation répondent aux critères", champ["label"]) is not None:
+                    out_data[field_name] = not bool(champ["checked"])
+                elif (
+                    re.search(
+                        r"^Les caractéristiques techniques de mon installation répondent aux critères",
+                        champ["label"],
+                    )
+                    is not None
+                ):
                     field_name = "ex_techniq"
                     out_data[field_name] = bool(champ["checked"])
                 elif champ["__typename"] == "CarteChamp" and "parcelles" in champ["label"]:
                     field_name = "num_parcelles"
+                    geometry = ogr.CreateGeometryFromWkt("MULTIPOLYGON EMPTY", SOURCE_SRS)
                     for geo_area in champ["geoAreas"]:
                         if geo_area["source"] == "cadastre":
-                            parcel_uid = "{0}{1}{2:0>2}{3:0>4}".format(
+                            parcel_uid = "{}{}{:0>2}{:0>4}".format(
                                 geo_area["commune"],
                                 geo_area["prefixe"],
                                 geo_area["section"],
                                 geo_area["numero"],
                             )
                             parcels_list.append(parcel_uid)
+                            parcel_geom = ogr.CreateGeometryFromJson(
+                                json.dumps(geo_area["geometry"], indent=None)
+                            )
+                            # This geometry's SRS in the source is EPSG:4326 but with swapped axis
+                            # Axes order: (longitude, latitude)
+                            parcel_geom.SwapXY()
+                            parcel_geom.AssignSpatialReference(SOURCE_SRS)
+                            geometry.AddGeometry(parcel_geom)
                         else:
                             contains_raw_geometry = True
                     if len(parcels_list) == 0:
@@ -261,18 +329,20 @@ def format_feature(in_data: Dict) -> Dict:
                 logger.warning(f"---------- {exc_type}: {exc.args[0]}")
         try:
             if out_data["porteur"]:
-                out_data["siret_port"] = str(in_data["demandeur"]['siret'])
+                out_data["siret_port"] = str(in_data["demandeur"]["siret"])
             if not out_data["transit"]:
                 out_data["ex_date"] = False
             if len(parcels_list) > 0:
                 out_data["num_parcelles"] = ";".join(parcels_list)
+            out_data["geom"] = geometry
         except Exception as exc:
             logger.error(f"on dossier '{dossier_number}'")
             logger.error(f"---------- {traceback.format_exc()}")
             raise exc
     return out_data
-    
-def format_source_result(data: Dict) -> List:
+
+
+def format_source_result(data: dict) -> list:
     """Transform input data to output data
 
     Args:
@@ -291,12 +361,13 @@ def format_source_result(data: Dict) -> List:
     feature_list.sort(key=lambda feature: feature["id_dossier"])
     return deepcopy(feature_list)
 
-def load_configuration(path: Path) -> Dict:
+
+def load_configuration(path: Path) -> dict:
     """Returns validated configuration from file
-    
+
     Args:
         path (str): path to the configuration file
-    
+
     Raises:
         jonschema.ValidationError: The configuration file does
             not match the validation schema
@@ -319,17 +390,24 @@ def load_configuration(path: Path) -> Dict:
         modified_configuration = deepcopy(source_configuration)
         # Output database
         modified_configuration["output"]["_pg_string"] = (
-            "host=" + modified_configuration['output']['host']
-            + " port=" + str(modified_configuration['output']['port'])
-            + " dbname=" + modified_configuration['output']['name']
-            + " user=" + modified_configuration['output']['user']
-            + " password=" + modified_configuration['output']['password'])
+            "host="
+            + modified_configuration["output"]["host"]
+            + " port="
+            + str(modified_configuration["output"]["port"])
+            + " dbname="
+            + modified_configuration["output"]["name"]
+            + " user="
+            + modified_configuration["output"]["user"]
+            + " password="
+            + modified_configuration["output"]["password"]
+        )
         return modified_configuration
     except Exception as exc:
         logger.error(traceback.format_exc())
         raise exc
 
-def query_source_api(input_conf: Dict) -> Dict:
+
+def query_source_api(input_conf: dict) -> dict:
     """Read input data from the source GraphQL API
 
     Args:
@@ -338,9 +416,10 @@ def query_source_api(input_conf: Dict) -> Dict:
     Returns:
         Dict: The converted input data with its original structure
     """
-    gql_headers = {
-        "Authorization": "Bearer {0:s}".format(input_conf["auth_token"]) 
-    }
+    resource_dir = os.environ.get("OCSGE_PV_RESOURCE_DIR")
+    if resource_dir is None or resource_dir.strip() == "":
+        resource_dir = "/app/src/ocsge_pv/resources"
+    gql_headers = {"Authorization": "Bearer {:s}".format(input_conf["auth_token"])}
     aiohttp_client_session_args = {
         # The followig option let the client use the proxy defined by environment variables
         # Else, the proxy must be defined in the .netrc file
@@ -351,19 +430,20 @@ def query_source_api(input_conf: Dict) -> Dict:
         url=input_conf["api_url"],
         headers=gql_headers,
         ssl=True,
-        client_session_args=aiohttp_client_session_args
+        client_session_args=aiohttp_client_session_args,
     )
     gql_client = Client(transport=transport, fetch_schema_from_transport=True)
-    gql_query_filepath = Path(os.environ["HOME"], "ocsge-pv-resources/get_demarche_query.gql")
+    gql_query_filepath = Path(resource_dir, "get_demarche_query.gql")
     with open(gql_query_filepath, encoding="utf-8") as query_file:
         query_string = query_file.read()
     query_gql = gql(query_string)
     query_params = {
         "demarcheNumber": input_conf["demarche_id"],
-        "includeDossiers": True,
         "includeChamps": True,
+        "includeDossiers": True,
+        "includeGeometry": True,
+        "order": "ASC",
         "state": "accepte",
-        "order": "ASC"
     }
     date_filter = input_conf.get("min_update_datetime")
     if date_filter is not None:
@@ -371,9 +451,10 @@ def query_source_api(input_conf: Dict) -> Dict:
     result = gql_client.execute(query_gql, variable_values=query_params)
     return deepcopy(result)
 
-def write_output(output_conf: Dict, data: List) -> None:
+
+def write_output(output_conf: dict, data: list) -> None:
     """Write declarations to database
-    
+
     Args:
         output_conf (Dict): configuration used to access the database
         data (List): list of output data to insert
@@ -383,71 +464,107 @@ def write_output(output_conf: Dict, data: List) -> None:
         cur = conn.cursor()
         try:
             with conn.transaction():
+                coord_transform = None
+                swap = False
+                table_srid = int(
+                    cur.execute(
+                        sql.SQL("SELECT Find_SRID({schema}, {table}, 'geom')").format(
+                            schema=sql.Identifier(output_conf["schema"]),
+                            table=sql.Identifier(output_conf["table"]),
+                        )
+                    ).fetchone()[0]
+                )
+                if table_srid == SOURCE_SRID:
+                    table_srs = SOURCE_SRS.Clone()
+                else:
+                    table_srs = osr.SpatialReference()
+                    table_srs.ImportFromEPSG(table_srid)
+                    coord_transform = osr.CreateCoordinateTransformation(SOURCE_SRID, table_srid)
+                if (
+                    table_srs.EPSGTreatsAsLatLong() == 1
+                    or table_srs.EPSGTreatsAsNorthingEasting() == 1
+                ):
+                    swap = True
                 for feature in data:
                     id_count_row = cur.execute(
-                        sql.SQL(
-                            "SELECT COUNT(*) FROM {table} WHERE {id_key} = {id_value}"
-                        ).format(
+                        sql.SQL("SELECT COUNT(*) FROM {table} WHERE {id_key} = {id_value}").format(
                             table=sql.Identifier(output_conf["schema"], output_conf["table"]),
                             id_key=sql.Identifier("id_dossier"),
-                            id_value=sql.Placeholder()
+                            id_value=sql.Placeholder(),
                         ),
-                        [feature["id_dossier"]]
+                        [feature["id_dossier"]],
                     ).fetchone()
                     keys_list = []
                     values_list = []
                     if id_count_row[0] == 0:
                         for field in feature.keys():
                             keys_list.append(sql.Identifier(field))
-                            values_list.append(feature[field])
+                            if field == "geom":
+                                geom_ogr = feature[field].Clone()
+                                if coord_transform is not None:
+                                    geom_ogr.Transform(coord_transform)
+                                if swap:
+                                    geom_ogr.SwapXY()
+                                    # PostGIS only uses (lon,lat) or (east,noth) order in WKT
+                                geom_wkt = geom_ogr.ExportToWkt()
+                                values_list.append(f"ST_GeomFromText('{geom_wkt}')")
+                            else:
+                                values_list.append(feature[field])
                         values_count = len(values_list)
                         instruction = sql.SQL(
                             "INSERT INTO {table} ({keys}) VALUES({values})"
                         ).format(
-                                table=sql.Identifier(output_conf["schema"], output_conf["table"]),
-                                keys=sql.SQL(", ").join(keys_list),
-                                values=sql.SQL(", ").join(sql.Placeholder() * values_count)
+                            table=sql.Identifier(output_conf["schema"], output_conf["table"]),
+                            keys=sql.SQL(", ").join(keys_list),
+                            values=sql.SQL(", ").join(sql.Placeholder() * values_count),
                         )
-                        cur.execute(
-                            instruction,
-                            values_list
-                        )
+                        cur.execute(instruction, values_list)
                     elif id_count_row[0] == 1:
                         # What to do if this declaration is already described in the database ?
                         for field in feature.keys():
-                            if field != "id_dossier":
+                            if field == "geom":
+                                keys_list.append(sql.Identifier(field))
+                                geom_ogr = feature[field].Clone()
+                                if coord_transform is not None:
+                                    geom_ogr.Transform(coord_transform)
+                                if swap:
+                                    geom_ogr.SwapXY()
+                                    # PostGIS only uses (lon,lat) or (east,noth) order in WKT
+                                geom_wkt = geom_ogr.ExportToWkt()
+                                values_list.append(f"ST_GeomFromText('{geom_wkt}')")
+                            elif field != "id_dossier":
                                 keys_list.append(sql.Identifier(field))
                                 values_list.append(feature[field])
                         values_count = len(values_list)
                         instruction = sql.SQL(
                             "UPDATE {table} SET ({keys}) = ({values}) WHERE {id_key} = {id_value}"
                         ).format(
-                                table=sql.Identifier(output_conf["schema"], output_conf["table"]),
-                                keys=sql.SQL(", ").join(keys_list),
-                                values=sql.SQL(", ").join(sql.Placeholder() * values_count),
-                                id_key=sql.Identifier("id_dossier"),
-                                id_value=feature["id_dossier"]
+                            table=sql.Identifier(output_conf["schema"], output_conf["table"]),
+                            keys=sql.SQL(", ").join(keys_list),
+                            values=sql.SQL(", ").join(sql.Placeholder() * values_count),
+                            id_key=sql.Identifier("id_dossier"),
+                            id_value=feature["id_dossier"],
                         )
-                        cur.execute(
-                            instruction,
-                            values_list
-                        )
+                        cur.execute(instruction, values_list)
                     else:
-                        raise ValueError(("To many declarations found in database with id_dossier="
-                            + f"{feature['id_dossier']}: {id_count_row[0]} entries found."))
+                        raise ValueError(
+                            "To many declarations found in database with id_dossier="
+                            + f"{feature['id_dossier']}: {id_count_row[0]} entries found."
+                        )
         except Exception as exc:
             logger.error(traceback.format_exc())
             conn.rollback()
             raise exc
 
+
 # -- MAIN FUNCTION --
 def main() -> int:
     """Main routine, entrypoint for the program
-        
+
     Args:
         path (str): path to the configuration file
             (implicit, contained in sys.argv[])
-    
+
     Returns:
         int: shell exit code of the execution
     """
@@ -466,11 +583,12 @@ def main() -> int:
         write_output(configuration["output"], output_data)
         logger.info("End of declaration data import.")
         return 0
-    except Exception as exc:
+    except Exception:
         logger.error(traceback.format_exc())
         return 1
 
+
 # -- MAIN SCRIPT --
-if (__name__ == "__main__"):
+if __name__ == "__main__":
     exit_code = main()
     sys.exit(exit_code)
