@@ -5,21 +5,16 @@ See internal docstrings for more information.
 Each variable prefixed by "m_" is a mock, or part of it.
 """
 
-from copy import deepcopy
 import json
-from pathlib import Path
 import os
-import re
-from unittest import TestCase, mock, skip
-from unittest.mock import MagicMock, call, mock_open, patch
+from copy import deepcopy
+from pathlib import Path
+from unittest import TestCase
+from unittest.mock import call, mock_open, patch
 
-from jsonschema import validate, ValidationError
-from psycopg import sql
-import pytest
+from jsonschema import ValidationError, validate
 
-from ocsge_pv.pair_from_sources import (
-    load_configuration,
-)
+from ocsge_pv.pair_from_sources import load_configuration
 
 try:
     OCSGE_PV_FIXTURE_DIR = Path(os.environ.get("OCSGE_PV_FIXTURE_DIR").strip()).resolve()
@@ -38,19 +33,21 @@ except:
 # * compute links list
 # * write link in photovoltaic output table (link table) if it doesn't exist
 
-#Tests
+
+# Tests
 class TestConfigurationValidationSchema(TestCase):
     """Tests the configuration validation schema itself."""
+
     def setUp(self):
         self.schema_path = f"{OCSGE_PV_RESOURCE_DIR}/pair_config.schema.json"
         self.f_config_ok_path = f"{OCSGE_PV_FIXTURE_DIR}/pair_config.ok.json"
         self.f_config_nok_path = f"{OCSGE_PV_FIXTURE_DIR}/pair_config.nok.json"
-        with open(self.schema_path, "r", encoding="utf-8") as fp:
+        with open(self.schema_path, encoding="utf-8") as fp:
             self.schema = json.load(fp)
 
     def test_with_valid_config(self):
         # Preparation
-        with open(self.f_config_ok_path, "r", encoding="utf-8") as fp:
+        with open(self.f_config_ok_path, encoding="utf-8") as fp:
             f_config_obj = json.load(fp)
         # Call to the tested function
         result = validate(f_config_obj, self.schema)
@@ -59,14 +56,16 @@ class TestConfigurationValidationSchema(TestCase):
 
     def test_with_invalid_config(self):
         # Preparation
-        with open(self.f_config_nok_path, "r", encoding="utf-8") as fp:
+        with open(self.f_config_nok_path, encoding="utf-8") as fp:
             f_config_obj = json.load(fp)
         # Call to the tested function (while asserting Exception)
         with self.assertRaises(ValidationError):
             validate(f_config_obj, self.schema)
 
+
 class TestConfigurationLoader(TestCase):
     """Tests the configuration loader."""
+
     def setUp(self):
         self.env_copy = deepcopy(os.environ)
         self.env_copy["OCSGE_PV_RESOURCE_DIR"] = str(OCSGE_PV_RESOURCE_DIR)
@@ -76,28 +75,27 @@ class TestConfigurationLoader(TestCase):
         self.f_config_nok_path = Path(OCSGE_PV_FIXTURE_DIR, "pair_config.nok.json")
         ## Configuration file, nominal
         self.f_config_ok_raw = ""
-        with open(self.f_config_ok_path, "r", encoding="utf-8") as file:
+        with open(self.f_config_ok_path, encoding="utf-8") as file:
             self.f_config_ok_raw = file.read()
         ## Configuration object, nominal before validation
         self.f_config_ok_obj = json.loads(self.f_config_ok_raw)
         ## Configuration object, nominal after complete load
         f_config_loaded_path = Path(OCSGE_PV_FIXTURE_DIR, "pair_config.loaded.json")
-        with open(f_config_loaded_path, "r", encoding="utf-8") as file:
+        with open(f_config_loaded_path, encoding="utf-8") as file:
             f_config_loaded_raw = file.read()
         self.f_config_loaded_obj = json.loads(f_config_loaded_raw)
         ## Configuration file, invalid
         self.f_config_nok_raw = ""
-        with open(self.f_config_nok_path, "r", encoding="utf-8") as file:
+        with open(self.f_config_nok_path, encoding="utf-8") as file:
             self.f_config_nok_raw = file.read()
         ## Configuration object, invalid
         self.f_config_nok_obj = json.loads(self.f_config_nok_raw)
 
         ## Configuration file path
-        self.f_config_schema_path = Path(OCSGE_PV_RESOURCE_DIR,
-            "pair_config.schema.json")
+        self.f_config_schema_path = Path(OCSGE_PV_RESOURCE_DIR, "pair_config.schema.json")
         ## Configuration file, nominal
         self.f_config_schema_raw = ""
-        with open(self.f_config_schema_path, "r", encoding="utf-8") as file:
+        with open(self.f_config_schema_path, encoding="utf-8") as file:
             self.f_config_schema_raw = file.read()
         ## Configuration object, nominal
         self.f_config_schema_obj = json.loads(self.f_config_schema_raw)
@@ -108,7 +106,7 @@ class TestConfigurationLoader(TestCase):
         # Preparation
         m_open.side_effect = [
             mock_open(read_data=self.f_config_ok_raw).return_value,
-            mock_open(read_data=self.f_config_schema_raw).return_value
+            mock_open(read_data=self.f_config_schema_raw).return_value,
         ]
         expected_result = deepcopy(self.f_config_loaded_obj)
         # Call to the tested function
@@ -116,10 +114,12 @@ class TestConfigurationLoader(TestCase):
             result = load_configuration(self.f_config_ok_path)
         # Assertions
         m_open.assert_called()
-        m_open.assert_has_calls([
-            call(self.f_config_ok_path, "r", encoding="utf-8"),
-            call(self.f_config_schema_path, "r", encoding="utf-8")
-        ])
+        m_open.assert_has_calls(
+            [
+                call(self.f_config_ok_path, encoding="utf-8"),
+                call(self.f_config_schema_path, encoding="utf-8"),
+            ]
+        )
         m_validator.assert_called_with(self.f_config_ok_obj, self.f_config_schema_obj)
         self.assertDictEqual(result, expected_result)
 
@@ -129,7 +129,7 @@ class TestConfigurationLoader(TestCase):
         # Preparation
         m_open.side_effect = [
             mock_open(read_data=self.f_config_nok_raw).return_value,
-            mock_open(read_data=self.f_config_schema_raw).return_value
+            mock_open(read_data=self.f_config_schema_raw).return_value,
         ]
         # Call to the tested function (while asserting Exception)
         with patch.dict(os.environ, self.env_copy):
@@ -137,8 +137,10 @@ class TestConfigurationLoader(TestCase):
                 result = load_configuration(self.f_config_nok_path)
         # Assertions
         m_open.assert_called()
-        m_open.assert_has_calls([
-            call(self.f_config_nok_path, "r", encoding="utf-8"),
-            call(self.f_config_schema_path, "r", encoding="utf-8")
-        ])
+        m_open.assert_has_calls(
+            [
+                call(self.f_config_nok_path, encoding="utf-8"),
+                call(self.f_config_schema_path, encoding="utf-8"),
+            ]
+        )
         m_validator.assert_called_with(self.f_config_nok_obj, self.f_config_schema_obj)

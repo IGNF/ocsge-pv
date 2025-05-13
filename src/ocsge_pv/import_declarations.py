@@ -380,10 +380,10 @@ def load_configuration(path: Path) -> dict:
         if resource_dir is None or resource_dir.strip() == "":
             resource_dir = "/app/src/ocsge_pv/resources"
         validation_schema_path = Path(resource_dir, "import_declarations_config.schema.json")
-        with open(path, "r", encoding="utf-8") as config_file:
+        with open(path, encoding="utf-8") as config_file:
             config_str = config_file.read()
         source_configuration = json.loads(config_str)
-        with open(validation_schema_path, "r", encoding="utf-8") as schema_file:
+        with open(validation_schema_path, encoding="utf-8") as schema_file:
             schema_str = schema_file.read()
         schema = json.loads(schema_str)
         jsonschema.validate(source_configuration, schema)

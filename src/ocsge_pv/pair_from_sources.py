@@ -22,32 +22,33 @@ This file contains the following functions :
 # -- IMPORTS --
 # standard library
 import argparse
-from copy import deepcopy
-from datetime import date, datetime
 import json
 import logging
 import os
-from pathlib import Path
 import sys
 import traceback
-from typing import Dict, List, Tuple
+from copy import deepcopy
+from datetime import date
+from pathlib import Path
 
 # 3rd party
-from osgeo import ogr, osr
 import jsonschema
 import psycopg
+from osgeo import ogr, osr
 from psycopg import sql
 
 # -- GLOBALS --
 NAME = "pair_from_sources"
 TRACE = 5
-logging.basicConfig(level=logging.INFO,
-    format="%(asctime)s %(name)s(%(funcName)s) %(levelname)s: %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s %(name)s(%(funcName)s) %(levelname)s: %(message)s"
+)
 logging.addLevelName(TRACE, "TRACE")
 logging.captureWarnings(True)
 logger = logging.getLogger(NAME)
 ogr.UseExceptions()
 osr.UseExceptions()
+
 
 # -- FUNCTIONS --
 def cli_arg_parser() -> argparse.Namespace:
@@ -61,32 +62,28 @@ def cli_arg_parser() -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(
         prog=NAME,
-        description=(
-            "Establishes links between declaration data and remote detection data"
-        )
+        description=("Establishes links between declaration data and remote detection data"),
     )
-    parser.add_argument("path",
-        type=Path,
-        help="the path of the configuration file for %(prog)s"
+    parser.add_argument("path", type=Path, help="the path of the configuration file for %(prog)s")
+    parser.add_argument(
+        "-v", "--verbose", dest="verbose", action="store_true", help="output more logs"
     )
-    parser.add_argument("-v", "--verbose",
-        dest="verbose",
-        action="store_true",
-        help="output more logs"
-    )
-    parser.add_argument("-vv", "--very_verbose",
+    parser.add_argument(
+        "-vv",
+        "--very_verbose",
         dest="very_verbose",
         action="store_true",
-        help="output even more logs"
+        help="output even more logs",
     )
     return parser.parse_args()
 
-def load_configuration(path: Path) -> Dict:
+
+def load_configuration(path: Path) -> dict:
     """Returns validated configuration from file
-    
+
     Args:
         path (str): path to the configuration file
-    
+
     Raises:
         jonschema.ValidationError: The configuration file does not
             match the validation schema
@@ -99,28 +96,35 @@ def load_configuration(path: Path) -> Dict:
         if resource_dir is None or resource_dir.strip() == "":
             resource_dir = "/app/src/ocsge_pv/resources"
         validation_schema_path = Path(resource_dir, "pair_config.schema.json")
-        with open(path, "r", encoding="utf-8") as config_file:
+        with open(path, encoding="utf-8") as config_file:
             config_str = config_file.read()
         source_configuration = json.loads(config_str)
-        with open(validation_schema_path, "r", encoding="utf-8") as schema_file:
+        with open(validation_schema_path, encoding="utf-8") as schema_file:
             schema_str = schema_file.read()
         schema = json.loads(schema_str)
         jsonschema.validate(source_configuration, schema)
         modified_configuration = deepcopy(source_configuration)
         modified_configuration["main_database"]["_pg_string"] = (
-            "host=" + modified_configuration['main_database']['host']
-            + " port=" + str(modified_configuration['main_database']['port'])
-            + " dbname=" + modified_configuration['main_database']['name']
-            + " user=" + modified_configuration['main_database']['user']
-            + " password=" + modified_configuration['main_database']['password'])
+            "host="
+            + modified_configuration["main_database"]["host"]
+            + " port="
+            + str(modified_configuration["main_database"]["port"])
+            + " dbname="
+            + modified_configuration["main_database"]["name"]
+            + " user="
+            + modified_configuration["main_database"]["user"]
+            + " password="
+            + modified_configuration["main_database"]["password"]
+        )
         return modified_configuration
     except Exception as exc:
         logger.error(traceback.format_exc())
         raise exc
 
-def write_output(output_conf: Dict, out_link_list: List[Tuple]) -> None:
+
+def write_output(output_conf: dict, out_link_list: list[tuple]) -> None:
     """Write pairings to database, in the link table
-    
+
     Args:
         output_conf (Dict): configuration used to access the output database
         update_list (List[Tuple]): list of (fid, geometry) of declarations to update
@@ -138,15 +142,13 @@ def write_output(output_conf: Dict, out_link_list: List[Tuple]) -> None:
                         sql.SQL(
                             "SELECT * FROM {table} WHERE {decl_key} = %s AND {dete_key} = %s"
                         ).format(
-                            table=sql.Identifier(output_conf["schema"],
-                                output_conf["tables"]["links"]),
+                            table=sql.Identifier(
+                                output_conf["schema"], output_conf["tables"]["links"]
+                            ),
                             decl_key=sql.Identifier("declaration_id"),
-                            dete_key=sql.Identifier("detection_id")
+                            dete_key=sql.Identifier("detection_id"),
                         ),
-                        (
-                            link_obj["declaration_id"],
-                            link_obj["detection_id"]
-                        )
+                        (link_obj["declaration_id"], link_obj["detection_id"]),
                     )
                     result = cur.fetchone()
                     # Ajout si inexistant
@@ -156,15 +158,13 @@ def write_output(output_conf: Dict, out_link_list: List[Tuple]) -> None:
                             sql.SQL(
                                 "INSERT INTO {table} ({decl_key}, {dete_key}) VALUES (%s, %s)"
                             ).format(
-                                table=sql.Identifier(output_conf["schema"],
-                                    output_conf["tables"]["links"]),
+                                table=sql.Identifier(
+                                    output_conf["schema"], output_conf["tables"]["links"]
+                                ),
                                 decl_key=sql.Identifier("declaration_id"),
-                                dete_key=sql.Identifier("detection_id")
+                                dete_key=sql.Identifier("detection_id"),
                             ),
-                            (
-                                link_obj["declaration_id"],
-                                link_obj["detection_id"]
-                            )
+                            (link_obj["declaration_id"], link_obj["detection_id"]),
                         )
                         new_pairs_count += 1
         except Exception as exc:
@@ -173,14 +173,15 @@ def write_output(output_conf: Dict, out_link_list: List[Tuple]) -> None:
             raise exc
     logger.debug(f"{new_pairs_count} new pairs inserted in database.")
 
+
 # -- MAIN FUNCTION --
 def main() -> int:
     """Main routine, entrypoint for the program
-        
+
     Args:
         path (str): path to the configuration file
             (implicit, contained in sys.argv[])
-    
+
     Returns:
         int: shell exit code of the execution
     """
@@ -200,54 +201,74 @@ def main() -> int:
         configuration = load_configuration(cli_args.path)
         # OGR layers and spatial references
         logger.info("Preparing OGR entities...")
-        latlon_sr_name_list = ['WGS 84']
-        ogr_pg_connection = ogr.Open(("PG: " + configuration["main_database"]["_pg_string"]))
+        latlon_sr_name_list = ["WGS 84"]
+        ogr_pg_connection = ogr.Open("PG: " + configuration["main_database"]["_pg_string"])
         ## Declarations layer
-        declaration_table = ".".join((configuration["main_database"]["schema"],
-            configuration["main_database"]["tables"]["declarations"]))
+        declaration_table = ".".join(
+            (
+                configuration["main_database"]["schema"],
+                configuration["main_database"]["tables"]["declarations"],
+            )
+        )
         declaration_ogr_layer = ogr_pg_connection.GetLayerByName(declaration_table)
         if declaration_ogr_layer is None:
             raise Exception(f"Declaration layer '{declaration_table}' was not loaded.")
-        logger.log(TRACE,
-            f"FID column for declaration layer: '{declaration_ogr_layer.GetFIDColumn()}'")
+        logger.log(
+            TRACE, f"FID column for declaration layer: '{declaration_ogr_layer.GetFIDColumn()}'"
+        )
         declaration_osr_sr = declaration_ogr_layer.GetSpatialRef()
         if declaration_osr_sr is None:
             raise Exception(
-                f"Spatial reference for declaration layer '{declaration_table}' was not found.")
-        is_declaration_sr_latlon = (declaration_osr_sr.EPSGTreatsAsLatLong()
-            or declaration_osr_sr.GetName() in latlon_sr_name_list)
+                f"Spatial reference for declaration layer '{declaration_table}' was not found."
+            )
+        is_declaration_sr_latlon = (
+            declaration_osr_sr.EPSGTreatsAsLatLong()
+            or declaration_osr_sr.GetName() in latlon_sr_name_list
+        )
         logger.debug(f"Declarations layer's SRS: {declaration_osr_sr.GetName()}")
         ## Detections layer
-        detection_table = ".".join((configuration["main_database"]["schema"],
-            configuration["main_database"]["tables"]["detections"]))
+        detection_table = ".".join(
+            (
+                configuration["main_database"]["schema"],
+                configuration["main_database"]["tables"]["detections"],
+            )
+        )
         detection_ogr_layer = ogr_pg_connection.GetLayerByName(detection_table)
         if detection_ogr_layer is None:
             raise Exception(f"Detection layer '{detection_table}' was not loaded.")
-        logger.log(TRACE,
-            f"FID column for detection layer: '{detection_ogr_layer.GetFIDColumn()}'")
+        logger.log(TRACE, f"FID column for detection layer: '{detection_ogr_layer.GetFIDColumn()}'")
         detection_osr_sr = detection_ogr_layer.GetSpatialRef()
         if detection_osr_sr is None:
             raise Exception(
-                f"Spatial reference for detection layer '{detection_table}' was not found.")
-        is_detection_sr_latlon = (detection_osr_sr.EPSGTreatsAsLatLong()
-            or detection_osr_sr.GetName() in latlon_sr_name_list)
+                f"Spatial reference for detection layer '{detection_table}' was not found."
+            )
+        is_detection_sr_latlon = (
+            detection_osr_sr.EPSGTreatsAsLatLong()
+            or detection_osr_sr.GetName() in latlon_sr_name_list
+        )
         logger.debug(f"Detections layer's SRS: {detection_osr_sr.GetName()}")
         ## Pairing layer
-        pairing_table = ".".join((configuration["main_database"]["schema"],
-            configuration["main_database"]["tables"]["links"]))
+        pairing_table = ".".join(
+            (
+                configuration["main_database"]["schema"],
+                configuration["main_database"]["tables"]["links"],
+            )
+        )
         pairing_ogr_layer = ogr_pg_connection.GetLayerByName(pairing_table)
         if pairing_ogr_layer is None:
             raise Exception(f"Pairing layer '{pairing_table}' was not loaded.")
         ## Coordinates transformations
         coordinates_transformation = None
-        need_coordinates_swap = False # True if the two spatial references use a different axis order
+        need_coordinates_swap = (
+            False  # True if the two spatial references use a different axis order
+        )
         if detection_osr_sr != declaration_osr_sr:
             logger.debug("Coordinates transformation is necessary.")
             coordinates_transformation = osr.CoordinateTransformation(
-                declaration_osr_sr, detection_osr_sr)
-            need_coordinates_swap = (
-                (is_detection_sr_latlon and not is_declaration_sr_latlon)
-                or (is_declaration_sr_latlon and not is_detection_sr_latlon)
+                declaration_osr_sr, detection_osr_sr
+            )
+            need_coordinates_swap = (is_detection_sr_latlon and not is_declaration_sr_latlon) or (
+                is_declaration_sr_latlon and not is_detection_sr_latlon
             )
             if need_coordinates_swap:
                 logger.debug("Axis order swapping is necessary for this transformation.")
@@ -258,9 +279,11 @@ def main() -> int:
         declaration_dict = {}
         for farm_feature in declaration_ogr_layer:
             farm_id = farm_feature.GetFID()
-            if (farm_feature.geometry() is not None 
-                    and farm_feature.GetField('date_insta') is not None):
-                iso_installation_date = farm_feature.GetField('date_insta').replace("/", "-")
+            if (
+                farm_feature.geometry() is not None
+                and farm_feature.GetField("date_insta") is not None
+            ):
+                iso_installation_date = farm_feature.GetField("date_insta").replace("/", "-")
                 declaration_dict[farm_id] = {
                     "installation_date": date.fromisoformat(iso_installation_date),
                     "geom": farm_feature.geometry().Clone(),
@@ -296,7 +319,7 @@ def main() -> int:
                     # Temporal intersection
                     install_year = declaration_dict[declaration_id]["installation_date"].year
                     detection_year = int(detection_dict[detection_id]["millesime"])
-                    time_intersect_bool = (detection_year >= install_year)
+                    time_intersect_bool = detection_year >= install_year
                     # Conclusion
                     is_pair = geom_intersect_bool and time_intersect_bool
                     if is_pair:
@@ -310,12 +333,12 @@ def main() -> int:
         write_output(configuration["main_database"], out_link_list)
         logger.info("End of declarations' pairing with detections.")
         return 0
-    except Exception as exc:
+    except Exception:
         logger.error(traceback.format_exc())
         return 1
 
 
 # -- MAIN SCRIPT --
-if (__name__ == "__main__"):
+if __name__ == "__main__":
     exit_code = main()
     sys.exit(exit_code)
