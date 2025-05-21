@@ -84,10 +84,15 @@ docker run -v <conf_host_filepath>:<conf_container_filepath> local/ocsge-pv <exe
 | ex_agriv | bool |  |
 | ex_techniq | bool |  |
 | geom | geometry(MULTIPOLYGON,2154) |  |
-| last_update | timestamp (0) with time zone |  |
+| creation | timestamp (0) with time zone |  |
+| dern_modif | timestamp (0) with time zone |  |
+| archive | bool |  |
+| supprime_u | bool |  |
+| supprime_i | bool |  |
 
 #### Autres exécutables
-Même chose sans la colonne `last_update`.
+Même chose sans les colonnes `dern_modif`, `archive`, `supprime_u`, `supprime_i`.
+Si une base de données dédiée est utilisée pour extraire les données du service "démarches simplifiées", alors ces colonnes permettent le filtrage des données à transférer vers la base de données de travail et de diffusion. (Celle utilisée par les exécutables autres que "import_declarations".)
 
 ### Table des données de télédétection
 | Colonne | Type | Contraintes |

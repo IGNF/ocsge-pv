@@ -51,7 +51,8 @@ from psycopg import sql
 # -- GLOBALS --
 NAME = "import_declarations"
 logging.basicConfig(
-    level=logging.INFO, format=r"%(asctime)s %(name)s\(%(funcName)s\) %(levelname)s: %(message)s"
+    level=logging.INFO,
+    format=r"%(asctime)s %(name)s\(%(funcName)s\) %(levelname)s: %(message)s",
 )
 # logging.captureWarnings(True)
 AIOHTTPTransport_logger.setLevel(logging.WARNING)
@@ -80,7 +81,9 @@ def cli_arg_parser() -> argparse.Namespace:
             + " service API, and insert them into a database."
         ),
     )
-    parser.add_argument("path", type=Path, help="the path of the configuration file for %(prog)s")
+    parser.add_argument(
+        "path", type=Path, help="the path of the configuration file for %(prog)s"
+    )
     parser.add_argument(
         "-v", "--verbose", dest="verbose", action="store_true", help="output more logs"
     )
@@ -132,11 +135,20 @@ def format_feature(in_data: dict) -> dict:
         "ex_agriv": None,
         "ex_techniq": None,
         "geom": None,
+        "creation": None,
+        "dern_modif": None,
+        "archive": None,
+        "supprime": None,
     }
     if in_data is not None:
         dossier_number = in_data["number"]
         out_data["id_dossier"] = dossier_number
-        out_data["dern_modif"] = datetime.fromisoformat(in_data["dateDerniereModification"])
+        out_data["dern_modif"] = datetime.fromisoformat(
+            in_data["dateDerniereModification"]
+        )
+        out_data["creation"] = datetime.fromisoformat(in_data["dateDepot"])
+        out_data["archive"] = in_data["archived"]
+        out_data["supprime"] = in_data["dateSuppressionParUsager"] is not None
         parcels_list = []
         contains_raw_geometry = False
         for champ in in_data["champs"]:
@@ -144,7 +156,8 @@ def format_feature(in_data: dict) -> dict:
             try:
                 if (
                     re.search(
-                        r"^Cas particulier des projets en période transitoire +:", champ["label"]
+                        r"^Cas particulier des projets en période transitoire +:",
+                        champ["label"],
                     )
                     is not None
                 ):  #
@@ -160,7 +173,10 @@ def format_feature(in_data: dict) -> dict:
                     field_name = "ex_date"
                     out_data[field_name] = bool(champ["checked"])
                 elif (
-                    re.search(r"^Cas particulier des projets agrivoltaïques +:", champ["label"])
+                    re.search(
+                        r"^Cas particulier des projets agrivoltaïques +:",
+                        champ["label"],
+                    )
                     is not None
                 ):  #
                     field_name = "agrivolt"
@@ -174,14 +190,19 @@ def format_feature(in_data: dict) -> dict:
                 ):
                     field_name = "ex_agriv"
                     out_data[field_name] = bool(champ["checked"])
-                elif re.search(r"^Etes-vous le porteur de projet", champ["label"]) is not None:
+                elif (
+                    re.search(r"^Etes-vous le porteur de projet", champ["label"])
+                    is not None
+                ):
                     field_name = "porteur"
                     out_data[field_name] = bool(champ["checked"])
                 elif re.search(r"SIRET du porteur", champ["label"]) is not None:
                     field_name = "siret_port"
                     out_data[field_name] = str(champ["stringValue"])
                 elif (
-                    re.search(r"référence de l'autorisation d'urbanisme", champ["label"])
+                    re.search(
+                        r"référence de l'autorisation d'urbanisme", champ["label"]
+                    )
                     is not None
                 ):
                     field_name = "ref_urba"
@@ -191,7 +212,8 @@ def format_feature(in_data: dict) -> dict:
                     out_data[field_name] = str(champ["stringValue"])
                 elif (
                     re.search(
-                        r"installations de type trackers.*surface du socle béton", champ["label"]
+                        r"installations de type trackers.*surface du socle béton",
+                        champ["label"],
                     )
                     is not None
                 ):
@@ -205,7 +227,8 @@ def format_feature(in_data: dict) -> dict:
                     out_data[field_name] = int(champ["integerNumber"])
                 elif (
                     re.search(
-                        r"date du dépôt de la demande d'autorisation d'urbanisme", champ["label"]
+                        r"date du dépôt de la demande d'autorisation d'urbanisme",
+                        champ["label"],
                     )
                     is not None
                 ):
@@ -213,28 +236,47 @@ def format_feature(in_data: dict) -> dict:
                     out_data[field_name] = date.fromisoformat(champ["date"])
                 elif (
                     re.search(
-                        r"date à laquelle l'autorisation d'urbanisme a été délivrée", champ["label"]
+                        r"date à laquelle l'autorisation d'urbanisme a été délivrée",
+                        champ["label"],
                     )
                     is not None
                 ):
                     field_name = "date_deliv"
                     out_data[field_name] = date.fromisoformat(champ["date"])
-                elif re.search(r"date d'installation effective", champ["label"]) is not None:
+                elif (
+                    re.search(r"date d'installation effective", champ["label"])
+                    is not None
+                ):
                     field_name = "date_insta"
                     out_data[field_name] = date.fromisoformat(champ["date"])
-                elif re.search(r"durée initiale d'exploitation", champ["label"]) is not None:
+                elif (
+                    re.search(r"durée initiale d'exploitation", champ["label"])
+                    is not None
+                ):
                     field_name = "duree_exp"
                     out_data[field_name] = int(champ["integerNumber"])
-                elif re.search(r"adresse d’implantation du projet", champ["label"]) is not None:
+                elif (
+                    re.search(r"adresse d’implantation du projet", champ["label"])
+                    is not None
+                ):
                     field_name = "adresse"
                     out_data[field_name] = str(champ["stringValue"])
-                elif re.search(r"surface occupée par l'installation", champ["label"]) is not None:
+                elif (
+                    re.search(r"surface occupée par l'installation", champ["label"])
+                    is not None
+                ):
                     field_name = "surf_occup"
                     out_data[field_name] = float(champ["decimalNumber"])
-                elif re.search(r"surface du terrain d’implantation", champ["label"]) is not None:
+                elif (
+                    re.search(r"surface du terrain d’implantation", champ["label"])
+                    is not None
+                ):
                     field_name = "surf_terr"
                     out_data[field_name] = float(champ["decimalNumber"])
-                elif re.search(r"Le projet est-il situé en \?", champ["label"]) is not None:
+                elif (
+                    re.search(r"Le projet est-il situé en \?", champ["label"])
+                    is not None
+                ):
                     field_name = "localisat"
                     out_data[field_name] = str(champ["stringValue"])
                 elif re.search(r"nature principale du sol", champ["label"]) is not None:
@@ -244,7 +286,9 @@ def format_feature(in_data: dict) -> dict:
                         field_name = "sol_detail"
                         out_data[field_name] = str(champ["secondaryValue"])
                 elif (
-                    re.search(r"type d’usage actuel du terrain d’implantation", champ["label"])
+                    re.search(
+                        r"type d’usage actuel du terrain d’implantation", champ["label"]
+                    )
                     is not None
                 ):
                     field_name = "usage_terr"
@@ -252,14 +296,23 @@ def format_feature(in_data: dict) -> dict:
                 elif re.search(r"type d’activité agricole", champ["label"]) is not None:
                     field_name = "type_agri"
                     out_data[field_name] = str(champ["stringValue"])
-                elif re.search(r"production agricole initiale", champ["label"]) is not None:
+                elif (
+                    re.search(r"production agricole initiale", champ["label"])
+                    is not None
+                ):
                     field_name = "agri_ini"
                     out_data[field_name] = str(champ["stringValue"])
-                elif re.search(r"production agricole résiduelle", champ["label"]) is not None:
+                elif (
+                    re.search(r"production agricole résiduelle", champ["label"])
+                    is not None
+                ):
                     field_name = "agri_resid"
                     out_data[field_name] = str(champ["stringValue"])
                 elif (
-                    re.search(r"ancrage au sol.*avec des pieux en bois ou en métal", champ["label"])
+                    re.search(
+                        r"ancrage au sol.*avec des pieux en bois ou en métal",
+                        champ["label"],
+                    )
                     is not None
                 ):
                     field_name = "nat_pieux"
@@ -276,7 +329,10 @@ def format_feature(in_data: dict) -> dict:
                 elif re.search(r"hauteur des panneaux", champ["label"]) is not None:
                     field_name = "haut_pann"
                     out_data[field_name] = float(champ["decimalNumber"])
-                elif re.search(r"espacement entre deux rangées", champ["label"]) is not None:
+                elif (
+                    re.search(r"espacement entre deux rangées", champ["label"])
+                    is not None
+                ):
                     field_name = "espacement"
                     out_data[field_name] = float(champ["decimalNumber"])
                 elif (
@@ -297,9 +353,14 @@ def format_feature(in_data: dict) -> dict:
                 ):
                     field_name = "ex_techniq"
                     out_data[field_name] = bool(champ["checked"])
-                elif champ["__typename"] == "CarteChamp" and "parcelles" in champ["label"]:
+                elif (
+                    champ["__typename"] == "CarteChamp"
+                    and "parcelles" in champ["label"]
+                ):
                     field_name = "num_parcelles"
-                    geometry = ogr.CreateGeometryFromWkt("MULTIPOLYGON EMPTY", SOURCE_SRS)
+                    geometry = ogr.CreateGeometryFromWkt(
+                        "MULTIPOLYGON EMPTY", SOURCE_SRS
+                    )
                     for geo_area in champ["geoAreas"]:
                         if geo_area["source"] == "cadastre":
                             parcel_uid = "{}{}{:0>2}{:0>4}".format(
@@ -320,9 +381,13 @@ def format_feature(in_data: dict) -> dict:
                         else:
                             contains_raw_geometry = True
                     if len(parcels_list) == 0:
-                        raise ValueError("Selected parcels list must contain at least one element.")
+                        raise ValueError(
+                            "Selected parcels list must contain at least one element."
+                        )
                     if contains_raw_geometry:
-                        raise ValueError(f"dossier '{dossier_number}' contains raw geometries")
+                        raise ValueError(
+                            f"dossier '{dossier_number}' contains raw geometries"
+                        )
             except (KeyError, TypeError, ValueError) as exc:
                 exc_type = str(type(exc)).replace("<class '", "").replace("'>", "")
                 logger.warning(f"on dossier '{dossier_number}', champ '{field_name}'")
@@ -362,6 +427,22 @@ def format_source_result(data: dict) -> list:
     return deepcopy(feature_list)
 
 
+def get_deleted_dossier_list(data: dict) -> list:
+    """Extract deleted dossiers from input data
+
+    Args:
+        data (Dict): input data with its original structure
+
+    Returns:
+        List: deleted dossiers id list
+    """
+    id_list = []
+    for entry in data["demarche"]["deletedDossiers"]["nodes"]:
+        if entry["number"] not in id_list:
+            id_list.append(entry["number"])
+    return deepcopy(id_list)
+
+
 def load_configuration(path: Path) -> dict:
     """Returns validated configuration from file
 
@@ -379,7 +460,9 @@ def load_configuration(path: Path) -> dict:
         resource_dir = os.environ.get("OCSGE_PV_RESOURCE_DIR")
         if resource_dir is None or resource_dir.strip() == "":
             resource_dir = "/app/src/ocsge_pv/resources"
-        validation_schema_path = Path(resource_dir, "import_declarations_config.schema.json")
+        validation_schema_path = Path(
+            resource_dir, "import_declarations_config.schema.json"
+        )
         with open(path, encoding="utf-8") as config_file:
             config_str = config_file.read()
         source_configuration = json.loads(config_str)
@@ -405,6 +488,56 @@ def load_configuration(path: Path) -> dict:
     except Exception as exc:
         logger.error(traceback.format_exc())
         raise exc
+
+
+def mark_as_deleted(output_conf: dict, data: list) -> None:
+    """Write declarations to database
+
+    Args:
+        output_conf (Dict): configuration used to access the database
+        data (List): list of deleted dossiers id
+    """
+    with psycopg.connect(output_conf["_pg_string"], autocommit=True) as conn:
+        cur = conn.cursor()
+        try:
+            with conn.transaction():
+                for id_dossier in data:
+                    id_count_row = cur.execute(
+                        sql.SQL(
+                            "SELECT COUNT(*) FROM {table} WHERE {id_key} = {id_value}"
+                        ).format(
+                            table=sql.Identifier(
+                                output_conf["schema"], output_conf["table"]
+                            ),
+                            id_key=sql.Identifier("id_dossier"),
+                            id_value=sql.Placeholder(),
+                        ),
+                        [id_dossier],
+                    ).fetchone()
+                    if id_count_row[0] == 1:
+                        instruction = sql.SQL(
+                            "UPDATE {table} SET ({key}) = ({value}) WHERE {id_key} = {id_value}"
+                        ).format(
+                            table=sql.Identifier(
+                                output_conf["schema"], output_conf["table"]
+                            ),
+                            key=sql.SQL("supprime"),
+                            value=sql.Placeholder(),
+                            id_key=sql.Identifier("id_dossier"),
+                            id_value=sql.Placeholder(),
+                        )
+                        cur.execute(
+                            instruction, {"value": True, "id_value": id_dossier}
+                        )
+                    elif id_count_row[0] > 1:
+                        raise ValueError(
+                            "To many declarations found in database with id_dossier="
+                            + f"{feature['id_dossier']}: {id_count_row[0]} entries found."
+                        )
+        except Exception as exc:
+            logger.error(traceback.format_exc())
+            conn.rollback()
+            raise exc
 
 
 def query_source_api(input_conf: dict) -> dict:
@@ -441,6 +574,7 @@ def query_source_api(input_conf: dict) -> dict:
         "demarcheNumber": input_conf["demarche_id"],
         "includeChamps": True,
         "includeDossiers": True,
+        "includeDeletedDossiers": True,
         "includeGeometry": True,
         "order": "ASC",
         "state": "accepte",
@@ -459,7 +593,6 @@ def write_output(output_conf: dict, data: list) -> None:
         output_conf (Dict): configuration used to access the database
         data (List): list of output data to insert
     """
-    declaration_id_list = []
     with psycopg.connect(output_conf["_pg_string"], autocommit=True) as conn:
         cur = conn.cursor()
         try:
@@ -479,7 +612,9 @@ def write_output(output_conf: dict, data: list) -> None:
                 else:
                     table_srs = osr.SpatialReference()
                     table_srs.ImportFromEPSG(table_srid)
-                    coord_transform = osr.CreateCoordinateTransformation(SOURCE_SRID, table_srid)
+                    coord_transform = osr.CreateCoordinateTransformation(
+                        SOURCE_SRID, table_srid
+                    )
                 if (
                     table_srs.EPSGTreatsAsLatLong() == 1
                     or table_srs.EPSGTreatsAsNorthingEasting() == 1
@@ -487,8 +622,12 @@ def write_output(output_conf: dict, data: list) -> None:
                     swap = True
                 for feature in data:
                     id_count_row = cur.execute(
-                        sql.SQL("SELECT COUNT(*) FROM {table} WHERE {id_key} = {id_value}").format(
-                            table=sql.Identifier(output_conf["schema"], output_conf["table"]),
+                        sql.SQL(
+                            "SELECT COUNT(*) FROM {table} WHERE {id_key} = {id_value}"
+                        ).format(
+                            table=sql.Identifier(
+                                output_conf["schema"], output_conf["table"]
+                            ),
                             id_key=sql.Identifier("id_dossier"),
                             id_value=sql.Placeholder(),
                         ),
@@ -514,7 +653,9 @@ def write_output(output_conf: dict, data: list) -> None:
                         instruction = sql.SQL(
                             "INSERT INTO {table} ({keys}) VALUES({values})"
                         ).format(
-                            table=sql.Identifier(output_conf["schema"], output_conf["table"]),
+                            table=sql.Identifier(
+                                output_conf["schema"], output_conf["table"]
+                            ),
                             keys=sql.SQL(", ").join(keys_list),
                             values=sql.SQL(", ").join(sql.Placeholder() * values_count),
                         )
@@ -539,7 +680,9 @@ def write_output(output_conf: dict, data: list) -> None:
                         instruction = sql.SQL(
                             "UPDATE {table} SET ({keys}) = ({values}) WHERE {id_key} = {id_value}"
                         ).format(
-                            table=sql.Identifier(output_conf["schema"], output_conf["table"]),
+                            table=sql.Identifier(
+                                output_conf["schema"], output_conf["table"]
+                            ),
                             keys=sql.SQL(", ").join(keys_list),
                             values=sql.SQL(", ").join(sql.Placeholder() * values_count),
                             id_key=sql.Identifier("id_dossier"),
@@ -577,10 +720,12 @@ def main() -> int:
         configuration = load_configuration(cli_args.path)
         logger.info("Fetching data...")
         input_data = query_source_api(configuration["input"])
+        deleted_data = get_deleted_dossier_list(input_data)
         logger.info("Formating data...")
         output_data = format_source_result(input_data)
         logger.info("Writing into database...")
         write_output(configuration["output"], output_data)
+        mark_as_deleted(configuration["output"], deleted_data)
         logger.info("End of declaration data import.")
         return 0
     except Exception:

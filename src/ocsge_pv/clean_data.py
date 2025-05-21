@@ -38,7 +38,8 @@ from osgeo import ogr, osr
 NAME = "clean_data"
 TRACE = 5
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s %(name)s(%(funcName)s) %(levelname)s: %(message)s"
+    level=logging.INFO,
+    format="%(asctime)s %(name)s(%(funcName)s) %(levelname)s: %(message)s",
 )
 logging.addLevelName(TRACE, "TRACE")
 logging.captureWarnings(True)
@@ -59,9 +60,13 @@ def cli_arg_parser() -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(
         prog=NAME,
-        description=("Establishes links between declaration data and remote detection data"),
+        description=(
+            "Establishes links between declaration data and remote detection data"
+        ),
     )
-    parser.add_argument("path", type=Path, help="the path of the configuration file for %(prog)s")
+    parser.add_argument(
+        "path", type=Path, help="the path of the configuration file for %(prog)s"
+    )
     parser.add_argument(
         "-v", "--verbose", dest="verbose", action="store_true", help="output more logs"
     )
@@ -149,7 +154,8 @@ def identify_to_delete(
         "detection": [],
         "link": [],
     }
-    for idu, declaration_list in declaration_parcels.items():
+    for idu in iter(declaration_parcels):
+
         print()
         # if idu in detection_parcels and len(detection_parcels[idu]) > 1:
         #     # a parcel selected in a declaration intersects several detections
@@ -190,7 +196,9 @@ def get_declared_parcels(data_layer: ogr.Layer) -> dict:
         feature_year = feature.GetFieldAsDateTime("date_insta")[0]
         # feature_last_update = datetime.fromisoformat(
         #     feature.GetFieldAsISO8601DateTime("last_update"))
-        feature_last_update = None  # Real value is not currently available in the database model
+        feature_last_update = (
+            None  # Real value is not currently available in the database model
+        )
         for parcel_idu in parcels_list:
             if parcel_idu not in parcels_dict:
                 parcels_dict[parcel_idu] = []
@@ -266,7 +274,9 @@ def main() -> int:
         if cli_args.verbose:
             logger.setLevel(logging.DEBUG)
             log_level_description = "verbose"
-        logger.info(f"Logging level: '{logger.getEffectiveLevel()}' ({log_level_description})")
+        logger.info(
+            f"Logging level: '{logger.getEffectiveLevel()}' ({log_level_description})"
+        )
         # Read configuration
         logger.info("Loading configuration...")
         configuration = load_configuration(cli_args.path)
@@ -337,16 +347,21 @@ def main() -> int:
             raise Exception(f"Parcels layer '{parcel_table}' was not loaded.")
         parcel_osr_sr = parcel_ogr_layer.GetSpatialRef()
         if parcel_osr_sr is None:
-            raise Exception(f"Spatial reference for parcels layer '{parcel_table}' was not found.")
+            raise Exception(
+                f"Spatial reference for parcels layer '{parcel_table}' was not found."
+            )
         is_parcel_sr_latlon = (
-            parcel_osr_sr.EPSGTreatsAsLatLong() or parcel_osr_sr.GetName() in latlon_sr_name_list
+            parcel_osr_sr.EPSGTreatsAsLatLong()
+            or parcel_osr_sr.GetName() in latlon_sr_name_list
         )
         logger.debug(f"Detections layer's SRS: {parcel_osr_sr.GetName()}")
         ## Coordinates transformations
         declaration_to_detection_ogr_cr = None
         declaration_to_detection_swap = False  # True if CRS' axis orders are different
         if detection_osr_sr != declaration_osr_sr:
-            logger.debug("Coordinates transformation is needed from declarations to detections.")
+            logger.debug(
+                "Coordinates transformation is needed from declarations to detections."
+            )
             declaration_to_detection_ogr_cr = osr.CoordinateTransformation(
                 declaration_osr_sr, detection_osr_sr
             )
@@ -354,26 +369,34 @@ def main() -> int:
                 is_detection_sr_latlon and not is_declaration_sr_latlon
             ) or (is_declaration_sr_latlon and not is_detection_sr_latlon)
             if declaration_to_detection_swap:
-                logger.debug("Axis order swapping is necessary for this transformation.")
+                logger.debug(
+                    "Axis order swapping is necessary for this transformation."
+                )
         parcel_to_detection_ogr_cr = None
         parcel_to_detection_swap = False  # True if CRS' axis orders are different
         if detection_osr_sr != parcel_osr_sr:
-            logger.debug("Coordinates transformation is needed from parcels to detections.")
+            logger.debug(
+                "Coordinates transformation is needed from parcels to detections."
+            )
             parcel_to_detection_ogr_cr = osr.CoordinateTransformation(
                 parcel_osr_sr, detection_osr_sr
             )
             detection_to_parcel_ogr_cr = osr.CoordinateTransformation(
                 detection_osr_sr, parcel_osr_sr
             )
-            parcel_to_detection_swap = (is_detection_sr_latlon and not is_parcel_sr_latlon) or (
-                is_parcel_sr_latlon and not is_detection_sr_latlon
-            )
+            parcel_to_detection_swap = (
+                is_detection_sr_latlon and not is_parcel_sr_latlon
+            ) or (is_parcel_sr_latlon and not is_detection_sr_latlon)
             if parcel_to_detection_swap:
-                logger.debug("Axis order swapping is necessary for this transformation.")
+                logger.debug(
+                    "Axis order swapping is necessary for this transformation."
+                )
         # Data fetching
         logger.info("Fetching source data...")
         declared_parcel_dict = get_declared_parcels(declaration_ogr_layer)
-        detected_parcel_dict = get_detected_parcels(detection_ogr_layer, parcel_ogr_layer)
+        detected_parcel_dict = get_detected_parcels(
+            detection_ogr_layer, parcel_ogr_layer
+        )
         to_delete_dict = {
             "declaration": [],
             "detection": [],
