@@ -20,7 +20,7 @@ This file contains the following functions :
 """
 
 # -- IMPORTS --
-# standard library
+
 import argparse
 import json
 import logging
@@ -31,17 +31,18 @@ from copy import deepcopy
 from datetime import date
 from pathlib import Path
 
-# 3rd party
 import jsonschema
 import psycopg
 from osgeo import ogr, osr
 from psycopg import sql
 
 # -- GLOBALS --
+
 NAME = "pair_from_sources"
 TRACE = 5
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s %(name)s(%(funcName)s) %(levelname)s: %(message)s"
+    level=logging.INFO,
+    format="%(asctime)s %(name)s(%(funcName)s) %(levelname)s: %(message)s",
 )
 logging.addLevelName(TRACE, "TRACE")
 logging.captureWarnings(True)
@@ -51,6 +52,7 @@ osr.UseExceptions()
 
 
 # -- FUNCTIONS --
+
 def cli_arg_parser() -> argparse.Namespace:
     """Parse CLI arguments
 
@@ -62,9 +64,13 @@ def cli_arg_parser() -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(
         prog=NAME,
-        description=("Establishes links between declaration data and remote detection data"),
+        description=(
+            "Establishes links between declaration data and remote detection data"
+        ),
     )
-    parser.add_argument("path", type=Path, help="the path of the configuration file for %(prog)s")
+    parser.add_argument(
+        "path", type=Path, help="the path of the configuration file for %(prog)s"
+    )
     parser.add_argument(
         "-v", "--verbose", dest="verbose", action="store_true", help="output more logs"
     )
@@ -153,13 +159,17 @@ def write_output(output_conf: dict, out_link_list: list[tuple]) -> None:
                     result = cur.fetchone()
                     # Ajout si inexistant
                     if result is None:
-                        logger.log(TRACE, f"Pair {link_obj} does not exist and will be inserted.")
+                        logger.log(
+                            TRACE,
+                            f"Pair {link_obj} does not exist and will be inserted.",
+                        )
                         cur.execute(
                             sql.SQL(
                                 "INSERT INTO {table} ({decl_key}, {dete_key}) VALUES (%s, %s)"
                             ).format(
                                 table=sql.Identifier(
-                                    output_conf["schema"], output_conf["tables"]["links"]
+                                    output_conf["schema"],
+                                    output_conf["tables"]["links"],
                                 ),
                                 decl_key=sql.Identifier("declaration_id"),
                                 dete_key=sql.Identifier("detection_id"),
@@ -174,7 +184,52 @@ def write_output(output_conf: dict, out_link_list: list[tuple]) -> None:
     logger.debug(f"{new_pairs_count} new pairs inserted in database.")
 
 
+# -- PROCESSING FUNCTIONS --
+
+def check_declared_parcels(data_layer: ogr.Layer) -> set:
+    """Check for duplicate parcels in declarations
+
+    Args:
+        data_layer (ogr.Layer): declarations data layer
+
+    Returns:
+        set: id sequence for declarations to delete
+    """
+    # Create a parcels dict with a more useful structure
+    parcels_dict = {}
+    for feature in data_layer:
+        feature_id = feature.GetFID()
+        parcels_list = feature.GetField("num_parcelles").split(";")
+        feature_year = feature.GetFieldAsDateTime("date_insta")[0]
+        feature_creation_date = feature.GetFieldAsISO8601DateTime("creation")
+        for parcel_idu in parcels_list:
+            if parcel_idu not in parcels_dict:
+                parcels_dict[parcel_idu] = {}
+            if feature_year not in parcels_dict[parcel_idu]:
+                parcels_dict[parcel_idu][feature_year] = {}
+            parcels_dict[parcel_idu][feature_year][feature_creation_date] = feature_id
+    # Create and fill the set of id to delete
+    deletion_set = set()
+    for idu in list(parcels_dict):
+        for year in list(parcels_dict[idu]):
+            # Check declarations for a specific parcel and installation year
+            # Find the most recent declaration in this setting
+            last_creation = None
+            for creation_iso in list(parcels_dict[idu][year]):
+                creation_object = datetime.fromisoformat(creation_iso)
+                if last_creation is None or last_creation < creation_object:
+                    last_creation = creation_object
+            # Mark any older declaration for deletion
+            for creation_iso in list(parcels_dict[idu][year]):
+                creation_object = datetime.fromisoformat(creation_iso)
+                detection_id = parcels_dict[idu][year][creation_iso]
+                if creation_object < last_creation:
+                    deletion_set.add(detection_id)
+    return deletion_set
+
+
 # -- MAIN FUNCTION --
+
 def main() -> int:
     """Main routine, entrypoint for the program
 
@@ -195,14 +250,18 @@ def main() -> int:
         elif cli_args.verbose:
             logger.setLevel(logging.DEBUG)
             log_level_description = "verbose"
-        logger.info(f"Logging level: '{logger.getEffectiveLevel()}' ({log_level_description})")
+        logger.info(
+            f"Logging level: '{logger.getEffectiveLevel()}' ({log_level_description})"
+        )
         # Read configuration
         logger.info("Loading configuration...")
         configuration = load_configuration(cli_args.path)
         # OGR layers and spatial references
         logger.info("Preparing OGR entities...")
         latlon_sr_name_list = ["WGS 84"]
-        ogr_pg_connection = ogr.Open("PG: " + configuration["main_database"]["_pg_string"])
+        ogr_pg_connection = ogr.Open(
+            "PG: " + configuration["main_database"]["_pg_string"]
+        )
         ## Declarations layer
         declaration_table = ".".join(
             (
@@ -214,7 +273,8 @@ def main() -> int:
         if declaration_ogr_layer is None:
             raise Exception(f"Declaration layer '{declaration_table}' was not loaded.")
         logger.log(
-            TRACE, f"FID column for declaration layer: '{declaration_ogr_layer.GetFIDColumn()}'"
+            TRACE,
+            f"FID column for declaration layer: '{declaration_ogr_layer.GetFIDColumn()}'",
         )
         declaration_osr_sr = declaration_ogr_layer.GetSpatialRef()
         if declaration_osr_sr is None:
@@ -236,7 +296,10 @@ def main() -> int:
         detection_ogr_layer = ogr_pg_connection.GetLayerByName(detection_table)
         if detection_ogr_layer is None:
             raise Exception(f"Detection layer '{detection_table}' was not loaded.")
-        logger.log(TRACE, f"FID column for detection layer: '{detection_ogr_layer.GetFIDColumn()}'")
+        logger.log(
+            TRACE,
+            f"FID column for detection layer: '{detection_ogr_layer.GetFIDColumn()}'",
+        )
         detection_osr_sr = detection_ogr_layer.GetSpatialRef()
         if detection_osr_sr is None:
             raise Exception(
@@ -267,15 +330,21 @@ def main() -> int:
             coordinates_transformation = osr.CoordinateTransformation(
                 declaration_osr_sr, detection_osr_sr
             )
-            need_coordinates_swap = (is_detection_sr_latlon and not is_declaration_sr_latlon) or (
-                is_declaration_sr_latlon and not is_detection_sr_latlon
-            )
+            need_coordinates_swap = (
+                is_detection_sr_latlon and not is_declaration_sr_latlon
+            ) or (is_declaration_sr_latlon and not is_detection_sr_latlon)
             if need_coordinates_swap:
-                logger.debug("Axis order swapping is necessary for this transformation.")
+                logger.debug(
+                    "Axis order swapping is necessary for this transformation."
+                )
+        # Check for duplicates in declarations
+        duplicate_declarations_set = check_declared_parcels(declaration_ogr_layer)
         # Data fetching
         logger.info("Fetching source data...")
         ## Declarations (with non-null geometries and installation dates)
-        logger.debug("Fetching declarations with non-null spatial and temproal attributes.")
+        logger.debug(
+            "Fetching declarations with non-null spatial and temproal attributes."
+        )
         declaration_dict = {}
         for farm_feature in declaration_ogr_layer:
             farm_id = farm_feature.GetFID()
@@ -283,7 +352,9 @@ def main() -> int:
                 farm_feature.geometry() is not None
                 and farm_feature.GetField("date_insta") is not None
             ):
-                iso_installation_date = farm_feature.GetField("date_insta").replace("/", "-")
+                iso_installation_date = farm_feature.GetField("date_insta").replace(
+                    "/", "-"
+                )
                 declaration_dict[farm_id] = {
                     "installation_date": date.fromisoformat(iso_installation_date),
                     "geom": farm_feature.geometry().Clone(),
@@ -313,11 +384,13 @@ def main() -> int:
             for declaration_id in declaration_dict.keys():
                 if declaration_dict[declaration_id]["geom"] is not None:
                     # Spatial intersection
-                    geom_intersect_bool = detection_dict[detection_id]["geom"].Intersects(
-                        declaration_dict[declaration_id]["geom"]
-                    )
+                    geom_intersect_bool = detection_dict[detection_id][
+                        "geom"
+                    ].Intersects(declaration_dict[declaration_id]["geom"])
                     # Temporal intersection
-                    install_year = declaration_dict[declaration_id]["installation_date"].year
+                    install_year = declaration_dict[declaration_id][
+                        "installation_date"
+                    ].year
                     detection_year = int(detection_dict[detection_id]["millesime"])
                     time_intersect_bool = detection_year >= install_year
                     # Conclusion
@@ -327,7 +400,9 @@ def main() -> int:
                         link_obj["declaration_id"] = declaration_id
                         link_obj["detection_id"] = detection_id
                         out_link_list.append(link_obj)
-        logger.debug(f"{len(out_link_list)} pairs. (Include previously existing pairs.)")
+        logger.debug(
+            f"{len(out_link_list)} pairs. (Include previously existing pairs.)"
+        )
         ## TODO? check if some previous pairs no longer exist?
         logger.info("Writing pairs in database...")
         write_output(configuration["main_database"], out_link_list)
@@ -339,6 +414,7 @@ def main() -> int:
 
 
 # -- MAIN SCRIPT --
+
 if __name__ == "__main__":
     exit_code = main()
     sys.exit(exit_code)

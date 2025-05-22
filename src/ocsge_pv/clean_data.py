@@ -8,17 +8,20 @@ The environment variable OCSGE_PV_RESOURCE_DIR describes the path to
 unset, /app/src/ocsge_pv/resources will be used instead.
 See cli_arg_parser for optionnal arguments.
 Documentation for the configuration file is provided:
-    * annotated schema: src/ocsge_pv/resources/clean_data.schema.json
+    * annotated schema: src/ocsge_pv/resources/clean_data_config.schema.json
     * example: tests/fixture/clean_data_config.ok.json
 
 This file contains the following functions :
     * cli_arg_parser - parse CLI arguments
-    * load_configuration - returns validated configuration from file
+    * get_declared_parcels - reference parcels used in declarations
+    * get_detected_parcels - reference parcels used in detections
+    * identify_to_delete - identify which entities should be deleted
+    * load_configuration - return validated configuration from file
     * main - main function of the script
 """
 
 # -- IMPORTS --
-# standard library
+
 import argparse
 import json
 import logging
@@ -30,18 +33,15 @@ from datetime import datetime
 from pathlib import Path
 
 import jsonschema
-
-# 3rd party
 from osgeo import ogr, osr
 
 # -- GLOBALS --
+
 NAME = "clean_data"
-TRACE = 5
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(name)s(%(funcName)s) %(levelname)s: %(message)s",
 )
-logging.addLevelName(TRACE, "TRACE")
 logging.captureWarnings(True)
 logger = logging.getLogger(NAME)
 ogr.UseExceptions()
@@ -130,6 +130,7 @@ def load_configuration(path: Path) -> dict:
 
 
 # -- PROCESSING FUNCTIONS --
+
 def identify_to_delete(
     declaration_parcels: dict,
     detection_parcels: dict,
@@ -209,7 +210,7 @@ def get_declared_parcels(data_layer: ogr.Layer) -> dict:
     return parcels_dict
 
 
-def get_declared_parcels(data_layer: ogr.Layer, ref_layer: ogr.Layer) -> dict:
+def get_detected_parcels(data_layer: ogr.Layer, ref_layer: ogr.Layer) -> dict:
     """References parcels used in detections
 
     Output structure is as following :
@@ -257,6 +258,7 @@ def get_declared_parcels(data_layer: ogr.Layer, ref_layer: ogr.Layer) -> dict:
 
 
 # -- MAIN FUNCTION --
+
 def main() -> int:
     """Main routine, entrypoint for the program
 
@@ -419,6 +421,7 @@ def main() -> int:
 
 
 # -- MAIN SCRIPT --
+
 if __name__ == "__main__":
     exit_code = main()
     sys.exit(exit_code)
