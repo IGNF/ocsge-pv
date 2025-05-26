@@ -14,8 +14,10 @@ Documentation for the configuration file is provided:
 
 This file contains the following functions :
     * cli_arg_parser - parse CLI arguments
+    * delete_before_matching - delete old conflicting declarations
+    * delete_after_matching - delete conflicting pairs after matching
     * load_configuration - returns validated configuration from file
-    * write_output - write pairs to output data table
+    * insert_new - write new pairs to output data table
     * main - main function of the script
 """
 
@@ -25,10 +27,11 @@ import argparse
 import json
 import logging
 import os
+import re
 import sys
 import traceback
 from copy import deepcopy
-from datetime import date
+from datetime import datetime
 from pathlib import Path
 
 import jsonschema
@@ -52,6 +55,7 @@ osr.UseExceptions()
 
 
 # -- FUNCTIONS --
+
 
 def cli_arg_parser() -> argparse.Namespace:
     """Parse CLI arguments
@@ -82,6 +86,149 @@ def cli_arg_parser() -> argparse.Namespace:
         help="output even more logs",
     )
     return parser.parse_args()
+
+
+def delete_before_matching(output_conf: dict, id_set: set[dict]) -> None:
+    """Delete older conflicting declarations from the link table
+
+    Delete the targeted declarations and their associated pairs
+
+    Args:
+        output_conf (dict): output database information
+        id_set (set[int]): set of targeted declarations' identifiers
+    """
+    deleted_dec_count = 0
+    deleted_pair_count = 0
+    with psycopg.connect(output_conf["_pg_string"]) as conn:
+        cur = conn.cursor()
+        try:
+            with conn.transaction():
+                for fid in id_set:
+                    logger.log(
+                        TRACE, f"Deleting pairs associated with declaration {fid}."
+                    )
+                    cur.execute(
+                        sql.SQL(
+                            "DELETE FROM {table} WHERE {dec_key} = {dec_value}"
+                        ).format(
+                            table=sql.Identifier(
+                                output_conf["schema"],
+                                output_conf["tables"]["links"],
+                            ),
+                            dec_key=sql.Identifier("declaration_id"),
+                        ),
+                        {"dec_value": fid},
+                    )
+                    pair_message = cur.statusmessage
+                    pair_count_match = re.match(r"DELETE +([0-9]+)", pair_message)
+                    pair_count_str = pair_count_match.group(1)
+                    pair_count_int = int(pair_count_str)
+                    deleted_pair_count += pair_count_int
+                    logger.log(TRACE, f"Deleting declaration {fid}.")
+                    cur.execute(
+                        sql.SQL(
+                            "DELETE FROM {table} WHERE {dec_key} = {dec_value}"
+                        ).format(
+                            table=sql.Identifier(
+                                output_conf["schema"],
+                                output_conf["tables"]["declarations"],
+                            ),
+                            dec_key=sql.Identifier("id_dossier"),
+                        ),
+                        {"dec_value": fid},
+                    )
+                    deleted_dec_count += 1
+        except Exception as exc:
+            logger.error(traceback.format_exc())
+            conn.rollback()
+            raise exc
+    logger.debug(f"{deleted_dec_count} declarations deleted from database.")
+    logger.debug(f"{deleted_pair_count} linked pairs deleted from database.")
+
+
+def delete_after_matching(output_conf: dict, link_set: set[dict]) -> None:
+    """Delete older conflicting pairs from the link table
+
+    Args:
+        output_conf (dict): output database information
+        link_set (set[dict]): set of pairs to delete, in the form
+            {
+                "declaration_id": int,
+                "detection_id": int
+            }
+    """
+    deleted_pairs_count = 0
+    with psycopg.connect(output_conf["_pg_string"]) as conn:
+        cur = conn.cursor()
+        try:
+            with conn.transaction():
+                for link_obj in out_link_list:
+                    logger.log(TRACE, f"Deleting pair {link_obj}.")
+                    cur.execute(
+                        sql.SQL(
+                            "DELETE FROM {table} WHERE {dec_key} = {dec_value} AND {det_key} = {det_value}"
+                        ).format(
+                            table=sql.Identifier(
+                                output_conf["schema"],
+                                output_conf["tables"]["links"],
+                            ),
+                            dec_key=sql.Identifier("declaration_id"),
+                            det_key=sql.Identifier("detection_id"),
+                        ),
+                        {
+                            "dec_value": link_obj["declaration_id"],
+                            "det_value": link_obj["detection_id"],
+                        },
+                    )
+                    message = cur.statusmessage
+                    count_match = re.match(r"DELETE +([0-9]+)", message)
+                    count_str = count_match.group(1)
+                    count_int = int(count_str)
+                    deleted_pairs_count += count_int
+        except Exception as exc:
+            logger.error(traceback.format_exc())
+            conn.rollback()
+            raise exc
+    logger.debug(f"{deleted_pairs_count} pairs deleted from database.")
+
+
+def insert_new(output_conf: dict, link_set: set[dict]) -> None:
+    """Insert new pairs in the link table
+
+    Args:
+        output_conf (dict): output database information
+        link_set (set[dict]): set of pairs to insert, in the form
+            {
+                "declaration_id": int,
+                "detection_id": int
+            }
+    """
+    new_pairs_count = 0
+    with psycopg.connect(output_conf["_pg_string"]) as conn:
+        cur = conn.cursor()
+        try:
+            with conn.transaction():
+                for link_obj in out_link_list:
+                    logger.log(TRACE, f"Inserting pair {link_obj}.")
+                    cur.execute(
+                        sql.SQL(
+                            "INSERT INTO {table} ({dec_key}, {det_key}) VALUES (%s, %s)"
+                        ).format(
+                            table=sql.Identifier(
+                                output_conf["schema"],
+                                output_conf["tables"]["links"],
+                            ),
+                            dec_key=sql.Identifier("declaration_id"),
+                            det_key=sql.Identifier("detection_id"),
+                        ),
+                        (link_obj["declaration_id"], link_obj["detection_id"]),
+                    )
+                    new_pairs_count += 1
+        except Exception as exc:
+            logger.error(traceback.format_exc())
+            conn.rollback()
+            raise exc
+    logger.debug(f"{new_pairs_count} new pairs inserted in database.")
 
 
 def load_configuration(path: Path) -> dict:
@@ -128,66 +275,16 @@ def load_configuration(path: Path) -> dict:
         raise exc
 
 
-def write_output(output_conf: dict, out_link_list: list[tuple]) -> None:
-    """Write pairings to database, in the link table
-
-    Args:
-        output_conf (Dict): configuration used to access the output database
-        update_list (List[Tuple]): list of (fid, geometry) of declarations to update
-        declaration_pkey (str): name of the private key column for declarations
-    """
-    new_pairs_count = 0
-    with psycopg.connect(output_conf["_pg_string"]) as conn:
-        cur = conn.cursor()
-        try:
-            with conn.transaction():
-                for link_obj in out_link_list:
-                    logger.log(TRACE, f"Treating pair {link_obj}.")
-                    # Vérification d'existence du lien
-                    cur.execute(
-                        sql.SQL(
-                            "SELECT * FROM {table} WHERE {decl_key} = %s AND {dete_key} = %s"
-                        ).format(
-                            table=sql.Identifier(
-                                output_conf["schema"], output_conf["tables"]["links"]
-                            ),
-                            decl_key=sql.Identifier("declaration_id"),
-                            dete_key=sql.Identifier("detection_id"),
-                        ),
-                        (link_obj["declaration_id"], link_obj["detection_id"]),
-                    )
-                    result = cur.fetchone()
-                    # Ajout si inexistant
-                    if result is None:
-                        logger.log(
-                            TRACE,
-                            f"Pair {link_obj} does not exist and will be inserted.",
-                        )
-                        cur.execute(
-                            sql.SQL(
-                                "INSERT INTO {table} ({decl_key}, {dete_key}) VALUES (%s, %s)"
-                            ).format(
-                                table=sql.Identifier(
-                                    output_conf["schema"],
-                                    output_conf["tables"]["links"],
-                                ),
-                                decl_key=sql.Identifier("declaration_id"),
-                                dete_key=sql.Identifier("detection_id"),
-                            ),
-                            (link_obj["declaration_id"], link_obj["detection_id"]),
-                        )
-                        new_pairs_count += 1
-        except Exception as exc:
-            logger.error(traceback.format_exc())
-            conn.rollback()
-            raise exc
-    logger.debug(f"{new_pairs_count} new pairs inserted in database.")
-
-
 # -- PROCESSING FUNCTIONS --
 
-def check_declared_parcels(data_layer: ogr.Layer) -> set:
+
+def check_declared_parcels(data_layer: ogr.Layer) -> set[int]:
     """Check for duplicate parcels in declarations
+
+    When multiple declarations, for the same installation date,
+    have at least one common selected parcel, only the most recent
+    declaration is deemed correct. The rest is discarded, and thus
+    marked for deletion.
 
     Args:
         data_layer (ogr.Layer): declarations data layer
@@ -228,7 +325,98 @@ def check_declared_parcels(data_layer: ogr.Layer) -> set:
     return deletion_set
 
 
+def match_dec_to_det(
+    dec_layer: ogr.Layer,
+    det_layer: ogr.Layer,
+    link_layer: ogr.Layer,
+    transform: osr.CoordinateTransformation,
+    need_swap: bool,
+) -> dict[set[dict]]:
+    """Declarations VS detections matching function
+
+    Args:
+        dec_layer (ogr.Layer): declarations OGR layer
+        det_layer (ogr.Layer): detections OGR layer
+        link_layer (ogr.Layer): pairings OGR layer
+        transform (osr.CoordinateTransformation): OSR coordinates
+            transformation from declaration to detection
+        need_swap (bool): axis swapping need in this transformation
+
+    Returns:
+        dict: pairs to create or delete
+            {
+                "new": set(
+                    {
+                        "declaration_id": int,
+                        "detection_id": int
+                    },
+                    ...
+                ),
+                "del": set(
+                    {
+                        "declaration_id": int,
+                        "detection_id": int
+                    },
+                    ...
+                )
+            }
+    """
+    result = {"new": set(), "del": set()}
+    for det_feature in det_layer:
+        linked_dec_dict = {}
+        old_linked_dec_set = set()
+        det_fid = det_feature.GetFID()
+        det_geom = det_feature.GetGeometryRef().Clone()
+        link_layer.SetAttributeFilter(f"detection_id = {det_fid}")
+        for link_feature in link_layer:
+            linked_dec_dict[link_feature.GetField("declaration_id")]
+            old_linked_dec_set.add(link_feature.GetField("declaration_id"))
+        for dec_feature in dec_layer:
+            dec_year = dec_feature.GetFieldAsDateTime("date_insta")[0]
+            dec_geom = dec_feature.GetGeometryRef().Clone()
+            if dec_geom is not None and det_feature.GetField("millesime") >= dec_year:
+                if need_swap:
+                    dec_geom.SwapXY()
+                if transform is not None:
+                    dec_geom.Transform(transform)
+                if det_geom.Intersects(dec_geom):
+                    creation_iso = dec_feature.GetFieldAsISO8601DateTime("creation")
+                    installation_iso = dec_feature.GetFieldAsISO8601DateTime(
+                        "date_insta"
+                    )
+                    linked_dec_dict[dec_feature.GetFID()] = {
+                        "creation": datetime.fromisoformat(creation_iso),
+                        "installation": datetime.fromisoformat(installation_iso),
+                    }
+        latest_fid = None
+        for dec_fid in list(linked_dec_dict):
+            dec_feature = dec_layer.GetFeature(dec_fid)
+            creation_iso = dec_feature.GetFieldAsISO8601DateTime("creation")
+            creation_dt = datetime.fromisoformat(creation_iso)
+            installation_iso = dec_feature.GetFieldAsISO8601DateTime("date_insta")
+            installation_dt = datetime.fromisoformat(installation_iso)
+            if linked_dec_dict[dec_fid] is None:
+                linked_dec_dict[dec_fid] = {
+                    "creation": creation_dt,
+                    "installation": installation_dt,
+                }
+            if (
+                latest_fid is None
+                or linked_dec_dict[latest_fid]["creation"] < creation_dt
+            ):
+                latest_fid = dec_fid
+        for dec_fid in list(linked_dec_dict):
+            link_obj = {"declaration_id": dec_fid, "detection_id": det_fid}
+            if dec_fid != latest_fid:
+                result["del"].add(link_obj)
+            elif dec_fid not in old_linked_dec_set:
+                result["new"].add(link_obj)
+        link_layer.SetAttributeFilter(None)
+    return result
+
+
 # -- MAIN FUNCTION --
+
 
 def main() -> int:
     """Main routine, entrypoint for the program
@@ -338,74 +526,23 @@ def main() -> int:
                     "Axis order swapping is necessary for this transformation."
                 )
         # Check for duplicates in declarations
-        duplicate_declarations_set = check_declared_parcels(declaration_ogr_layer)
-        # Data fetching
-        logger.info("Fetching source data...")
-        ## Declarations (with non-null geometries and installation dates)
-        logger.debug(
-            "Fetching declarations with non-null spatial and temproal attributes."
-        )
-        declaration_dict = {}
-        for farm_feature in declaration_ogr_layer:
-            farm_id = farm_feature.GetFID()
-            if (
-                farm_feature.geometry() is not None
-                and farm_feature.GetField("date_insta") is not None
-            ):
-                iso_installation_date = farm_feature.GetField("date_insta").replace(
-                    "/", "-"
-                )
-                declaration_dict[farm_id] = {
-                    "installation_date": date.fromisoformat(iso_installation_date),
-                    "geom": farm_feature.geometry().Clone(),
-                }
-                if coordinates_transformation is not None:
-                    new_geom = declaration_dict[farm_id]["geom"].Clone()
-                    if need_coordinates_swap:
-                        new_geom.SwapXY()
-                    new_geom.Transform(coordinates_transformation)
-                    declaration_dict[farm_id]["geom"] = new_geom.Clone()
-        logger.debug(f"{len(declaration_dict)} declarations fetched.")
-        ## Detections
-        logger.debug("Fetching detections.")
-        detection_dict = {}
-        for farm_feature in detection_ogr_layer:
-            farm_id = farm_feature.GetFID()
-            detection_dict[farm_id] = {
-                "millesime": farm_feature.GetField("millesime"),
-            }
-            detection_dict[farm_id]["geom"] = farm_feature.geometry().Clone()
-        logger.debug(f"{len(detection_dict)} detections fetched.")
-        ogr_pg_connection = None
+        logger.info("Checking for conflicting declarations...")
+        dupe_dec_set = check_declared_parcels(declaration_ogr_layer)
+        logger.info("Deleting conflicting declarations from database...")
+        delete_before_matching(configuration["main_database"], dupe_dec_set)
         # Pairing
-        logger.info("Computing pairs...")
-        out_link_list = []
-        for detection_id in detection_dict.keys():
-            for declaration_id in declaration_dict.keys():
-                if declaration_dict[declaration_id]["geom"] is not None:
-                    # Spatial intersection
-                    geom_intersect_bool = detection_dict[detection_id][
-                        "geom"
-                    ].Intersects(declaration_dict[declaration_id]["geom"])
-                    # Temporal intersection
-                    install_year = declaration_dict[declaration_id][
-                        "installation_date"
-                    ].year
-                    detection_year = int(detection_dict[detection_id]["millesime"])
-                    time_intersect_bool = detection_year >= install_year
-                    # Conclusion
-                    is_pair = geom_intersect_bool and time_intersect_bool
-                    if is_pair:
-                        link_obj = {}
-                        link_obj["declaration_id"] = declaration_id
-                        link_obj["detection_id"] = detection_id
-                        out_link_list.append(link_obj)
-        logger.debug(
-            f"{len(out_link_list)} pairs. (Include previously existing pairs.)"
+        logger.info("Matching pairs...")
+        match_dict = match_dec_to_det(
+            declaration_ogr_layer,
+            detection_ogr_layer,
+            pairing_ogr_layer,
+            coordinates_transformation,
+            need_coordinates_swap,
         )
-        ## TODO? check if some previous pairs no longer exist?
-        logger.info("Writing pairs in database...")
-        write_output(configuration["main_database"], out_link_list)
+        logger.info("Writing new pairs in database...")
+        insert_new(configuration["main_database"], match_dict["new"])
+        logger.info("Deleting conflicting pairs from database...")
+        delete_after_matching(configuration["main_database"], match_dict["del"])
         logger.info("End of declarations' pairing with detections.")
         return 0
     except Exception:
@@ -414,6 +551,7 @@ def main() -> int:
 
 
 # -- MAIN SCRIPT --
+
 
 if __name__ == "__main__":
     exit_code = main()
