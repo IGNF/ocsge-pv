@@ -427,20 +427,19 @@ def format_source_result(data: dict) -> list:
     return deepcopy(feature_list)
 
 
-def get_deleted_dossier_list(data: dict) -> list:
+def get_deleted_dossier_list(data: dict) -> set:
     """Extract deleted dossiers from input data
 
     Args:
         data (Dict): input data with its original structure
 
     Returns:
-        List: deleted dossiers id list
+        set: deleted dossiers id set
     """
-    id_list = []
+    id_set = set()
     for entry in data["demarche"]["deletedDossiers"]["nodes"]:
-        if entry["number"] not in id_list:
-            id_list.append(entry["number"])
-    return deepcopy(id_list)
+        id_set.add(entry["number"])
+    return deepcopy(id_set)
 
 
 def load_configuration(path: Path) -> dict:
@@ -490,12 +489,12 @@ def load_configuration(path: Path) -> dict:
         raise exc
 
 
-def mark_as_deleted(output_conf: dict, data: list) -> None:
+def mark_as_deleted(output_conf: dict, data: set) -> None:
     """Write declarations to database
 
     Args:
         output_conf (Dict): configuration used to access the database
-        data (List): list of deleted dossiers id
+        data (set): set of deleted dossiers id
     """
     with psycopg.connect(output_conf["_pg_string"], autocommit=True) as conn:
         cur = conn.cursor()
@@ -601,19 +600,28 @@ def write_output(output_conf: dict, data: list) -> None:
                 swap = False
                 table_srid = int(
                     cur.execute(
-                        sql.SQL("SELECT Find_SRID({schema}, {table}, 'geom')").format(
-                            schema=sql.Identifier(output_conf["schema"]),
-                            table=sql.Identifier(output_conf["table"]),
-                        )
+                        sql.SQL("SELECT Find_SRID({schema}, {table}, {column})").format(
+                            schema=sql.Placeholder("schema"),
+                            table=sql.Placeholder("table"),
+                            column=sql.Placeholder("column"),
+                        ),
+                        {
+                            "schema": output_conf["schema"],
+                            "table": output_conf["table"],
+                            "column": "geom",
+                        },
                     ).fetchone()[0]
                 )
+                logger.debug(f"Output table SRID: {repr(table_srid)}")
                 if table_srid == SOURCE_SRID:
                     table_srs = SOURCE_SRS.Clone()
+                    logger.debug(f"Output table SRID's name: {table_srs.GetName()}")
                 else:
                     table_srs = osr.SpatialReference()
                     table_srs.ImportFromEPSG(table_srid)
+                    logger.debug(f"Output table SRID's name: {table_srs.GetName()}")
                     coord_transform = osr.CreateCoordinateTransformation(
-                        SOURCE_SRID, table_srid
+                        SOURCE_SRS, table_srs
                     )
                 if (
                     table_srs.EPSGTreatsAsLatLong() == 1
