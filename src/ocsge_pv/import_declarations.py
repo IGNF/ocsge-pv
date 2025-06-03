@@ -24,7 +24,8 @@ This file contains the following functions :
 """
 
 # -- IMPORTS --
-# standard library
+
+
 import argparse
 import json
 import logging
@@ -38,17 +39,15 @@ from pathlib import Path
 
 import jsonschema
 import psycopg
-
-# 3rd party
 from gql import Client, gql
 from gql.transport.aiohttp import AIOHTTPTransport
 from gql.transport.aiohttp import log as AIOHTTPTransport_logger
 from osgeo import ogr, osr
 from psycopg import sql
 
-# package
-
 # -- GLOBALS --
+
+
 NAME = "import_declarations"
 logging.basicConfig(
     level=logging.INFO,
@@ -65,6 +64,8 @@ SOURCE_SRS.ImportFromEPSG(SOURCE_SRID)  # Axes order: (latitude, longitude)
 
 
 # -- FUNCTIONS --
+
+
 def cli_arg_parser() -> argparse.Namespace:
     """Parse CLI arguments
 
@@ -402,7 +403,6 @@ def format_feature(in_data: dict) -> dict:
             out_data["geom"] = geometry
         except Exception as exc:
             logger.error(f"on dossier '{dossier_number}'")
-            logger.error(f"---------- {traceback.format_exc()}")
             raise exc
     return out_data
 
@@ -485,7 +485,6 @@ def load_configuration(path: Path) -> dict:
         )
         return modified_configuration
     except Exception as exc:
-        logger.error(traceback.format_exc())
         raise exc
 
 
@@ -534,7 +533,6 @@ def mark_as_deleted(output_conf: dict, data: set) -> None:
                             + f"{feature['id_dossier']}: {id_count_row[0]} entries found."
                         )
         except Exception as exc:
-            logger.error(traceback.format_exc())
             conn.rollback()
             raise exc
 
@@ -553,7 +551,7 @@ def query_source_api(input_conf: dict) -> dict:
         resource_dir = "/app/src/ocsge_pv/resources"
     gql_headers = {"Authorization": "Bearer {:s}".format(input_conf["auth_token"])}
     aiohttp_client_session_args = {
-        # The followig option let the client use the proxy defined by environment variables
+        # The following option lets the client use the proxy defined by environment variables
         # Else, the proxy must be defined in the .netrc file
         # (its path, "$HOME/.netrc" by default, is defined by the "NETRC" environment variable)
         "trust_env": True
@@ -592,13 +590,17 @@ def write_output(output_conf: dict, data: list) -> None:
         output_conf (Dict): configuration used to access the database
         data (List): list of output data to insert
     """
+    keys_list = None
+    values_list = None
+    line_writing_mode = None
     with psycopg.connect(output_conf["_pg_string"], autocommit=True) as conn:
         cur = conn.cursor()
         try:
             with conn.transaction():
                 coord_transform = None
                 swap = False
-                table_srid = int(
+                instruction = None
+                out_srid = int(
                     cur.execute(
                         sql.SQL("SELECT Find_SRID({schema}, {table}, {column})").format(
                             schema=sql.Placeholder("schema"),
@@ -612,20 +614,20 @@ def write_output(output_conf: dict, data: list) -> None:
                         },
                     ).fetchone()[0]
                 )
-                logger.debug(f"Output table SRID: {repr(table_srid)}")
-                if table_srid == SOURCE_SRID:
-                    table_srs = SOURCE_SRS.Clone()
-                    logger.debug(f"Output table SRID's name: {table_srs.GetName()}")
+                logger.debug(f"Output table SRID: {repr(out_srid)}")
+                if out_srid == SOURCE_SRID:
+                    out_srs = SOURCE_SRS.Clone()
+                    logger.debug(f"Output table SRID's name: {out_srs.GetName()}")
                 else:
-                    table_srs = osr.SpatialReference()
-                    table_srs.ImportFromEPSG(table_srid)
-                    logger.debug(f"Output table SRID's name: {table_srs.GetName()}")
+                    out_srs = osr.SpatialReference()
+                    out_srs.ImportFromEPSG(out_srid)
+                    logger.debug(f"Output table SRID's name: {out_srs.GetName()}")
                     coord_transform = osr.CreateCoordinateTransformation(
-                        SOURCE_SRS, table_srs
+                        SOURCE_SRS, out_srs
                     )
                 if (
-                    table_srs.EPSGTreatsAsLatLong() == 1
-                    or table_srs.EPSGTreatsAsNorthingEasting() == 1
+                    out_srs.EPSGTreatsAsLatLong() == 1
+                    or out_srs.EPSGTreatsAsNorthingEasting() == 1
                 ):
                     swap = True
                 for feature in data:
@@ -641,74 +643,81 @@ def write_output(output_conf: dict, data: list) -> None:
                         ),
                         [feature["id_dossier"]],
                     ).fetchone()
-                    keys_list = []
-                    values_list = []
-                    if id_count_row[0] == 0:
-                        for field in feature.keys():
-                            keys_list.append(sql.Identifier(field))
-                            if field == "geom":
-                                geom_ogr = feature[field].Clone()
-                                if coord_transform is not None:
-                                    geom_ogr.Transform(coord_transform)
-                                if swap:
-                                    geom_ogr.SwapXY()
-                                    # PostGIS only uses (lon,lat) or (east,noth) order in WKT
-                                geom_wkt = geom_ogr.ExportToWkt()
-                                values_list.append(f"ST_GeomFromText('{geom_wkt}')")
-                            else:
-                                values_list.append(feature[field])
-                        values_count = len(values_list)
-                        instruction = sql.SQL(
-                            "INSERT INTO {table} ({keys}) VALUES({values})"
-                        ).format(
-                            table=sql.Identifier(
-                                output_conf["schema"], output_conf["table"]
-                            ),
-                            keys=sql.SQL(", ").join(keys_list),
-                            values=sql.SQL(", ").join(sql.Placeholder() * values_count),
-                        )
-                        cur.execute(instruction, values_list)
-                    elif id_count_row[0] == 1:
-                        # What to do if this declaration is already described in the database ?
-                        for field in feature.keys():
-                            if field == "geom":
-                                keys_list.append(sql.Identifier(field))
-                                geom_ogr = feature[field].Clone()
-                                if coord_transform is not None:
-                                    geom_ogr.Transform(coord_transform)
-                                if swap:
-                                    geom_ogr.SwapXY()
-                                    # PostGIS only uses (lon,lat) or (east,noth) order in WKT
-                                geom_wkt = geom_ogr.ExportToWkt()
-                                values_list.append(f"ST_GeomFromText('{geom_wkt}')")
-                            elif field != "id_dossier":
-                                keys_list.append(sql.Identifier(field))
-                                values_list.append(feature[field])
-                        values_count = len(values_list)
-                        instruction = sql.SQL(
-                            "UPDATE {table} SET ({keys}) = ({values}) WHERE {id_key} = {id_value}"
-                        ).format(
-                            table=sql.Identifier(
-                                output_conf["schema"], output_conf["table"]
-                            ),
-                            keys=sql.SQL(", ").join(keys_list),
-                            values=sql.SQL(", ").join(sql.Placeholder() * values_count),
-                            id_key=sql.Identifier("id_dossier"),
-                            id_value=feature["id_dossier"],
-                        )
-                        cur.execute(instruction, values_list)
-                    else:
+                    if id_count_row[0] > 1:
                         raise ValueError(
                             "To many declarations found in database with id_dossier="
                             + f"{feature['id_dossier']}: {id_count_row[0]} entries found."
                         )
+                    keys_list = []
+                    value_dict = {}
+                    geom_ogr = feature["geom"].Clone()
+                    if coord_transform is not None:
+                        geom_ogr.Transform(coord_transform)
+                    if swap:
+                        geom_ogr.SwapXY()
+                        # PostGIS only uses (lon,lat) or (east,noth) order in WKT
+                    geom_wkt = geom_ogr.ExportToWkt()
+                    value_dict["geom"] = geom_wkt
+                    if id_count_row[0] == 0:
+                        line_writing_mode = "insert"
+                        for field in feature.keys():
+                            if field != "geom":
+                                keys_list.append(field)
+                                value_dict[field] = feature[field]
+                        template = (
+                            "INSERT INTO {table} ({keys}, {geom_key}) "
+                            + "VALUES({values}, ST_GeomFromText({geom_value}))"
+                        )
+                        instruction = sql.SQL(template).format(
+                            table=sql.Identifier(
+                                output_conf["schema"], output_conf["table"]
+                            ),
+                            keys=sql.SQL(", ").join(map(sql.Identifier, keys_list)),
+                            values=sql.SQL(", ").join(map(sql.Placeholder, keys_list)),
+                            geom_key=sql.Identifier("geom"),
+                            geom_value=sql.Placeholder("geom"),
+                        )
+                        cur.execute(
+                            instruction,
+                            value_dict,
+                        )
+                    elif id_count_row[0] == 1:
+                        # What to do if this declaration is already described in the database ?
+                        line_writing_mode = "update"
+                        for field in feature.keys():
+                            if field not in ["id_dossier", "geom"]:
+                                keys_list.append(field)
+                                value_dict[field] = feature[field]
+                        template = (
+                            "UPDATE {table} SET ({keys}, {geom_key}) = ({values}, "
+                            + "ST_GeomFromText({geom_value})) WHERE {id_key} = {id_value}"
+                        )
+                        instruction = sql.SQL(template).format(
+                            table=sql.Identifier(
+                                output_conf["schema"], output_conf["table"]
+                            ),
+                            keys=sql.SQL(", ").join(map(sql.Identifier, keys_list)),
+                            values=sql.SQL(", ").join(map(sql.Placeholder, keys_list)),
+                            id_key=sql.Identifier("id_dossier"),
+                            id_value=feature["id_dossier"],
+                            geom_key=sql.Identifier("geom"),
+                            geom_value=sql.Placeholder("geom"),
+                        )
+                        cur.execute(
+                            instruction,
+                            value_dict,
+                        )
+
         except Exception as exc:
-            logger.error(traceback.format_exc())
             conn.rollback()
+            logger.error(f"Line writing mode: '{line_writing_mode}'\n")
+            logger.error(f"Values mapping: '{value_dict}'\n")
             raise exc
 
 
 # -- MAIN FUNCTION --
+
+
 def main() -> int:
     """Main routine, entrypoint for the program
 
@@ -742,6 +751,8 @@ def main() -> int:
 
 
 # -- MAIN SCRIPT --
+
+
 if __name__ == "__main__":
     exit_code = main()
     sys.exit(exit_code)
