@@ -1,4 +1,4 @@
-"""Describes unit tests for the ocsge_pv.import_declarations module.
+"""Describes unit tests for the ocsge_pv.clean_data module.
 
 There is one test class for each tested functionnality.
 See internal docstrings for more information.
@@ -15,7 +15,7 @@ from unittest.mock import call, mock_open, patch
 
 from jsonschema import ValidationError, validate
 
-from ocsge_pv.import_declarations import load_configuration
+from ocsge_pv.clean_data import load_configuration
 
 try:
     OCSGE_PV_FIXTURE_DIR = Path(os.environ.get("OCSGE_PV_FIXTURE_DIR").strip()).resolve()
@@ -32,9 +32,9 @@ class TestConfigurationValidationSchema(TestCase):
     """Tests the configuration validation schema itself."""
 
     def setUp(self):
-        self.schema_path = f"{OCSGE_PV_RESOURCE_DIR}/import_declarations_config.schema.json"
-        self.f_config_ok_path = f"{OCSGE_PV_FIXTURE_DIR}/import_declarations_config.ok.json"
-        self.f_config_nok_path = f"{OCSGE_PV_FIXTURE_DIR}/import_declarations_config.nok.json"
+        self.schema_path = f"{OCSGE_PV_RESOURCE_DIR}/clean_data_config.schema.json"
+        self.f_config_ok_path = f"{OCSGE_PV_FIXTURE_DIR}/clean_data_config.ok.json"
+        self.f_config_nok_path = f"{OCSGE_PV_FIXTURE_DIR}/clean_data_config.nok.json"
         with open(self.schema_path, encoding="utf-8") as fp:
             self.schema = json.load(fp)
 
@@ -64,8 +64,8 @@ class TestConfigurationLoader(TestCase):
         self.env_copy["OCSGE_PV_RESOURCE_DIR"] = str(OCSGE_PV_RESOURCE_DIR)
         # Fixtures
         ## Configuration file path
-        self.f_config_ok_path = Path(OCSGE_PV_FIXTURE_DIR, "import_declarations_config.ok.json")
-        self.f_config_nok_path = Path(OCSGE_PV_FIXTURE_DIR, "import_declarations_config.nok.json")
+        self.f_config_ok_path = Path(OCSGE_PV_FIXTURE_DIR, "clean_data_config.ok.json")
+        self.f_config_nok_path = Path(OCSGE_PV_FIXTURE_DIR, "clean_data_config.nok.json")
         ## Configuration file, nominal
         self.f_config_ok_raw = ""
         with open(self.f_config_ok_path, encoding="utf-8") as file:
@@ -73,7 +73,7 @@ class TestConfigurationLoader(TestCase):
         ## Configuration object, nominal before validation
         self.f_config_ok_obj = json.loads(self.f_config_ok_raw)
         ## Configuration object, nominal after complete load
-        f_config_loaded_path = Path(OCSGE_PV_FIXTURE_DIR, "import_declarations_config.loaded.json")
+        f_config_loaded_path = Path(OCSGE_PV_FIXTURE_DIR, "clean_data_config.loaded.json")
         with open(f_config_loaded_path, encoding="utf-8") as file:
             f_config_loaded_raw = file.read()
         self.f_config_loaded_obj = json.loads(f_config_loaded_raw)
@@ -85,9 +85,7 @@ class TestConfigurationLoader(TestCase):
         self.f_config_nok_obj = json.loads(self.f_config_nok_raw)
 
         ## Configuration file path
-        self.f_config_schema_path = Path(
-            OCSGE_PV_RESOURCE_DIR, "import_declarations_config.schema.json"
-        )
+        self.f_config_schema_path = Path(OCSGE_PV_RESOURCE_DIR, "clean_data_config.schema.json")
         ## Configuration file, nominal
         self.f_config_schema_raw = ""
         with open(self.f_config_schema_path, encoding="utf-8") as file:
@@ -103,7 +101,6 @@ class TestConfigurationLoader(TestCase):
             mock_open(read_data=self.f_config_ok_raw).return_value,
             mock_open(read_data=self.f_config_schema_raw).return_value,
         ]
-        expected_result = deepcopy(self.f_config_loaded_obj)
         # Call to the tested function
         with patch.dict(os.environ, self.env_copy):
             result = load_configuration(self.f_config_ok_path)
@@ -116,7 +113,7 @@ class TestConfigurationLoader(TestCase):
             ]
         )
         m_validator.assert_called_with(self.f_config_ok_obj, self.f_config_schema_obj)
-        self.assertDictEqual(result, expected_result)
+        self.assertDictEqual(result, self.f_config_loaded_obj)
 
     @patch("jsonschema.validate", side_effect=ValidationError("Invalid configuration."))
     @patch("builtins.open")

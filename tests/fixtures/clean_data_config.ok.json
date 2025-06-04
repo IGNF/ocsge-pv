@@ -6,7 +6,11 @@
         "user": "data_producer",
         "password": "bip-boop-123456",
         "schema": "photovoltaic",
-        "table": "declaration"
+        "tables": {
+            "detections": "detection",
+            "declarations": "declaration",
+            "links": "declaration_detection"
+        }
     },
     "cadastre_database": {
         "host": "localhost",

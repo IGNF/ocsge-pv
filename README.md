@@ -2,16 +2,14 @@
 ## Présentation
 Projet d'aggrégation de données concernant les parcs photovoltaïques en France, pour l'OCS GE.
 
-Ce projet traite des données obtenues depuis trois sources :
+Ce projet traite des données obtenues depuis deux sources :
 * Données de télédétection à partir de photographies aériennes
 * Dossiers de déclaration sur le formulaire [declaration_pv_decret2023-1408](https://www.demarches-simplifiees.fr/commencer/declaration_pv_decret2023-1408) du service "demarches-simplifiees.fr".
-* Données cadastrales du produit [Parcellaire Express (PCI)](https://geoservices.ign.fr/parcellaire-express-pci) de l'IGN, lui-même dérivé du plan cadastral informatisé (PCI) de la DGFiP). Ces données ne sont utilisées que pour le géoréfrencement des données de déclaration.
 
 ## Utilisation
 Le programme est séparé en plusieurs exécutables :
-* `import_declarations` : Importe les données sur les déclarations d'installations photovoltaïques vers une base de données PostgreSQL+PostGIS. Ces données ne sont pas encore référencées par un attribut de type "géométrie". À la place une liste de parcelles cadastrales intersectées est fournie pour chaque objet.
-* `geometrize_declarations` : Calcule l'attribut géométrie pour chaque objet qui décrit une déclaration. Pour cela, les géométries des parcelles cadastrales intersectées sont additionnées.
-* `pair_from_sources` : Détermine la correspondance entre les données de déclaration et celles de télédétection, et référence ces leins dans une table dédiée.
+* `import_declarations` : Importe les données sur les déclarations d'installations photovoltaïques vers une base de données PostgreSQL+PostGIS.
+* `pair_from_sources` : Détermine la correspondance entre les données de déclaration et celles de télédétection, et référence ces liens dans une table dédiée.
 
 Les BDD ne sont pas forcément partagées entre les exécutables. Pour chaque exécutable la structure des tables utilisées dans les BDD en entrée comme en sortie doit correspondre aux attentes du programme. Les seuls paramètres flexibles sur les données sont les paramètres de connexion aux BDD, ainsi que les noms de schémas et de tables. Dans le cas de `pair_from_sources`, les données doivent toutes se trouver dans un même schéma au sein d'une même BDD.
 
@@ -84,10 +82,14 @@ docker run -v <conf_host_filepath>:<conf_container_filepath> local/ocsge-pv <exe
 | ex_agriv | bool |  |
 | ex_techniq | bool |  |
 | geom | geometry(MULTIPOLYGON,2154) |  |
-| last_update | timestamp (0) with time zone |  |
+| creation | timestamp (0) with time zone |  |
+| dern_modif | timestamp (0) with time zone |  |
+| archive | bool |  |
+| supprime | bool |  |
 
 #### Autres exécutables
-Même chose sans la colonne `last_update`.
+Même chose sans les colonnes `dern_modif`, `archive`, `supprime`.
+Si une base de données dédiée est utilisée pour extraire les données du service "démarches simplifiées", alors ces colonnes permettent le filtrage des données à transférer vers la base de données de travail et de diffusion. (Celle utilisée par les exécutables autres que "import_declarations".)
 
 ### Table des données de télédétection
 | Colonne | Type | Contraintes |
@@ -110,18 +112,3 @@ Même chose sans la colonne `last_update`.
 | :------ | :--- | :---------- |
 | declaration_id | bigint | REFERENCES declaration |
 | detection_id | bigint | REFERENCES detection |
-
-### Table des données cadastrales
-| Colonne | Type |
-| :------ | :--- |
-| idu | character varying |
-| numero | character varying |
-| feuille | integer |
-| section | character varying |
-| code_dep | character varying |
-| nom_com | character varying |
-| code_com | character varying |
-| com_abs | character varying |
-| code_arr | character varying |
-| contenance | integer |
-| geom | geometry(MultiPolygon,2154) |

@@ -6,9 +6,12 @@
         "user": "data_producer",
         "password": "bip-boop-123456",
         "schema": "photovoltaic",
-        "table": "declaration",
-        "_pg_string": "host=192.168.0.1 port=5432 dbname=ocsge user=data_producer password=bip-boop-123456",
-        "_table_name_raw": "photovoltaic.declaration"
+        "tables": {
+            "detections": "detection",
+            "declarations": "declaration",
+            "links": "declaration_detection"
+        },
+        "_pg_string": "host=192.168.0.1 port=5432 dbname=ocsge user=data_producer password=bip-boop-123456"
     },
     "cadastre_database": {
         "host": "localhost",
@@ -18,7 +21,6 @@
         "password": "1arpent",
         "schema": "cadastre_data",
         "table": "parcels",
-        "_pg_string": "host=localhost port=5433 dbname=cadastre user=land_surveyor password=1arpent",
-        "_table_name_raw": "cadastre_data.parcels"
+        "_pg_string": "host=localhost port=5433 dbname=cadastre user=land_surveyor password=1arpent"
     }
 }

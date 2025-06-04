@@ -15,7 +15,6 @@ import sys
 
 # package
 from ocsge_pv.import_declarations import cli_arg_parser as import_declarations_cli
-from ocsge_pv.geometrize_declarations import cli_arg_parser as geometrize_declarations_cli
 from ocsge_pv.pair_from_sources import cli_arg_parser as pair_from_sources_cli
 
 # -- MAIN FUNCTION --
@@ -32,11 +31,6 @@ def main() -> int:
         print("---- import_declarations ----\n")
         try:
             import_declarations_cli()
-        except SystemExit:
-            print("\n-----------------------------")
-        print("-- geometrize_declarations --\n")
-        try:
-            geometrize_declarations_cli()
         except SystemExit:
             print("\n-----------------------------")
         print("----- pair_from_sources -----\n")

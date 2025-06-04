@@ -6,7 +6,7 @@ version = "0.0.0"
 description = "Python tools for generation of the photovoltaic data used in OCSGE from IGN France"
 readme = "README.md"
 requires-python = ">=3.10"
-license = {file = "LICENSE.md"}
+license-files = ["LICEN[CS]E.*"]
 
 keywords = ["aggregation", "OCSGE", "photovoltaic"]
 
@@ -19,8 +19,6 @@ classifiers = [
   "Development Status :: 3 - Alpha",
 
   "Topic :: Software Development",
-
-  "License :: MIT",
 
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.10",
@@ -61,6 +59,7 @@ test = [
 [project.scripts]
 ocsge-pv-help = "ocsge_pv.ocsge_pv_help:main"
 ocsge-pv = "ocsge_pv.ocsge_pv_help:main"
+clean_data = "ocsge_pv.clean_data:main"
 import_declarations = "ocsge_pv.import_declarations:main"
 geometrize_declarations = "ocsge_pv.geometrize_declarations:main"
 pair_from_sources = "ocsge_pv.pair_from_sources:main"
@@ -84,4 +83,3 @@ unfixable = []
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
