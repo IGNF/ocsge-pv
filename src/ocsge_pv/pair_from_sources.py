@@ -116,6 +116,7 @@ def delete_before_matching(output_conf: dict, id_set: set[dict]) -> None:
                                 output_conf["tables"]["links"],
                             ),
                             dec_key=sql.Identifier("declaration_id"),
+                            dec_value=sql.Placeholder("dec_value"),
                         ),
                         {"dec_value": fid},
                     )
@@ -134,6 +135,7 @@ def delete_before_matching(output_conf: dict, id_set: set[dict]) -> None:
                                 output_conf["tables"]["declarations"],
                             ),
                             dec_key=sql.Identifier("id_dossier"),
+                            dec_value=sql.Placeholder("dec_value"),
                         ),
                         {"dec_value": fid},
                     )
@@ -146,27 +148,24 @@ def delete_before_matching(output_conf: dict, id_set: set[dict]) -> None:
     logger.debug(f"{deleted_pair_count} linked pairs deleted from database.")
 
 
-def delete_after_matching(output_conf: dict, link_set: set[dict]) -> None:
+def delete_after_matching(output_conf: dict, link_set: set[tuple]) -> None:
     """Delete older conflicting pairs from the link table
 
     Args:
         output_conf (dict): output database information
-        link_set (set[dict]): set of pairs to delete, in the form
-            {
-                "declaration_id": int,
-                "detection_id": int
-            }
+        link_set (set[tuple]): set of pairs to delete, in the form
+            (declaration_id: int, detection_id: int)
     """
     deleted_pairs_count = 0
     with psycopg.connect(output_conf["_pg_string"]) as conn:
         cur = conn.cursor()
         try:
             with conn.transaction():
-                for link_obj in out_link_list:
-                    logger.log(TRACE, f"Deleting pair {link_obj}.")
+                for link_tuple in link_set:
+                    logger.log(TRACE, f"Deleting pair {link_tuple}.")
                     cur.execute(
                         sql.SQL(
-                            "DELETE FROM {table} WHERE {dec_key} = {dec_value} AND {det_key} = {det_value}"
+                            "DELETE FROM {table} WHERE {dec_key} = %s AND {det_key} = %s"
                         ).format(
                             table=sql.Identifier(
                                 output_conf["schema"],
@@ -175,10 +174,7 @@ def delete_after_matching(output_conf: dict, link_set: set[dict]) -> None:
                             dec_key=sql.Identifier("declaration_id"),
                             det_key=sql.Identifier("detection_id"),
                         ),
-                        {
-                            "dec_value": link_obj["declaration_id"],
-                            "det_value": link_obj["detection_id"],
-                        },
+                        link_tuple,
                     )
                     message = cur.statusmessage
                     count_match = re.match(r"DELETE +([0-9]+)", message)
@@ -192,24 +188,21 @@ def delete_after_matching(output_conf: dict, link_set: set[dict]) -> None:
     logger.debug(f"{deleted_pairs_count} pairs deleted from database.")
 
 
-def insert_new(output_conf: dict, link_set: set[dict]) -> None:
+def insert_new(output_conf: dict, link_set: set[tuple]) -> None:
     """Insert new pairs in the link table
 
     Args:
         output_conf (dict): output database information
-        link_set (set[dict]): set of pairs to insert, in the form
-            {
-                "declaration_id": int,
-                "detection_id": int
-            }
+        link_set (set[tuple]): set of pairs to insert, in the form
+            (declaration_id: int, detection_id: int)
     """
     new_pairs_count = 0
     with psycopg.connect(output_conf["_pg_string"]) as conn:
         cur = conn.cursor()
         try:
             with conn.transaction():
-                for link_obj in out_link_list:
-                    logger.log(TRACE, f"Inserting pair {link_obj}.")
+                for link_tuple in link_set:
+                    logger.log(TRACE, f"Inserting pair {link_tuple}.")
                     cur.execute(
                         sql.SQL(
                             "INSERT INTO {table} ({dec_key}, {det_key}) VALUES (%s, %s)"
@@ -221,7 +214,7 @@ def insert_new(output_conf: dict, link_set: set[dict]) -> None:
                             dec_key=sql.Identifier("declaration_id"),
                             det_key=sql.Identifier("detection_id"),
                         ),
-                        (link_obj["declaration_id"], link_obj["detection_id"]),
+                        link_tuple,
                     )
                     new_pairs_count += 1
         except Exception as exc:
@@ -298,7 +291,7 @@ def check_declared_parcels(data_layer: ogr.Layer) -> set[int]:
         feature_id = feature.GetFID()
         parcels_list = feature.GetField("num_parcelles").split(";")
         feature_year = feature.GetFieldAsDateTime("date_insta")[0]
-        feature_creation_date = feature.GetFieldAsISO8601DateTime("creation")
+        feature_creation_date = feature.GetField("creation").replace("/", "-")
         for parcel_idu in parcels_list:
             if parcel_idu not in parcels_dict:
                 parcels_dict[parcel_idu] = {}
@@ -346,17 +339,11 @@ def match_dec_to_det(
         dict: pairs to create or delete
             {
                 "new": set(
-                    {
-                        "declaration_id": int,
-                        "detection_id": int
-                    },
+                    (declaration_fid: int, detection_fid: int),
                     ...
                 ),
                 "del": set(
-                    {
-                        "declaration_id": int,
-                        "detection_id": int
-                    },
+                    (declaration_fid: int, detection_fid: int),
                     ...
                 )
             }
@@ -369,8 +356,22 @@ def match_dec_to_det(
         det_geom = det_feature.GetGeometryRef().Clone()
         link_layer.SetAttributeFilter(f"detection_id = {det_fid}")
         for link_feature in link_layer:
-            linked_dec_dict[link_feature.GetField("declaration_id")]
-            old_linked_dec_set.add(link_feature.GetField("declaration_id"))
+            dec_fid = link_feature.GetField("declaration_id")
+            dec_feature = dec_layer.GetFeature(dec_fid)
+            if dec_feature is None:
+                logger.warning(
+                    f"Link between detection {det_fid} and missing declaration {dec_fid} will be deleted."
+                )
+                link_tuple = (dec_fid, det_fid)
+                result["del"].add(link_tuple)
+            else:
+                creation_iso = dec_feature.GetField("creation").replace("/", "-")
+                installation_iso = dec_feature.GetField("date_insta").replace("/", "-")
+                linked_dec_dict[dec_fid] = {
+                    "creation": datetime.fromisoformat(creation_iso),
+                    "installation": datetime.fromisoformat(installation_iso),
+                }
+            old_linked_dec_set.add(dec_fid)
         for dec_feature in dec_layer:
             dec_year = dec_feature.GetFieldAsDateTime("date_insta")[0]
             dec_geom = dec_feature.GetGeometryRef().Clone()
@@ -380,9 +381,9 @@ def match_dec_to_det(
                 if transform is not None:
                     dec_geom.Transform(transform)
                 if det_geom.Intersects(dec_geom):
-                    creation_iso = dec_feature.GetFieldAsISO8601DateTime("creation")
-                    installation_iso = dec_feature.GetFieldAsISO8601DateTime(
-                        "date_insta"
+                    creation_iso = dec_feature.GetField("creation").replace("/", "-")
+                    installation_iso = dec_feature.GetField("date_insta").replace(
+                        "/", "-"
                     )
                     linked_dec_dict[dec_feature.GetFID()] = {
                         "creation": datetime.fromisoformat(creation_iso),
@@ -391,9 +392,9 @@ def match_dec_to_det(
         latest_fid = None
         for dec_fid in list(linked_dec_dict):
             dec_feature = dec_layer.GetFeature(dec_fid)
-            creation_iso = dec_feature.GetFieldAsISO8601DateTime("creation")
+            creation_iso = dec_feature.GetField("creation").replace("/", "-")
             creation_dt = datetime.fromisoformat(creation_iso)
-            installation_iso = dec_feature.GetFieldAsISO8601DateTime("date_insta")
+            installation_iso = dec_feature.GetField("date_insta").replace("/", "-")
             installation_dt = datetime.fromisoformat(installation_iso)
             if linked_dec_dict[dec_fid] is None:
                 linked_dec_dict[dec_fid] = {
@@ -406,11 +407,12 @@ def match_dec_to_det(
             ):
                 latest_fid = dec_fid
         for dec_fid in list(linked_dec_dict):
-            link_obj = {"declaration_id": dec_fid, "detection_id": det_fid}
+            # (declaration_fid, detection_fid) tuple
+            link_tuple = (dec_fid, det_fid)
             if dec_fid != latest_fid:
-                result["del"].add(link_obj)
+                result["del"].add(link_tuple)
             elif dec_fid not in old_linked_dec_set:
-                result["new"].add(link_obj)
+                result["new"].add(link_tuple)
         link_layer.SetAttributeFilter(None)
     return result
 
