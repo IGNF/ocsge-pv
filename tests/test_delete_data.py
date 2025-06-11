@@ -123,7 +123,7 @@ class TestConfigurationLoader(TestCase):
             ]
         )
         m_validator.assert_called_with(self.f_config_ok_obj, self.f_config_schema_obj)
-        self.assertDictEqual(result, self.f_config_loaded_obj)
+        self.assertEqual(result, self.f_config_loaded_obj)
 
     @patch("jsonschema.validate", side_effect=ValidationError("Invalid configuration."))
     @patch("builtins.open")
