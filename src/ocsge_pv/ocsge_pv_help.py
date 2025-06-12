@@ -9,18 +9,16 @@ This file contains the following functions :
     * main - main function of the script
 """
 
-# -- IMPORTS --
-# standard library
 import sys
 
-# package
+from ocsge_pv.delete_data import cli_arg_parser as delete_data_cli
 from ocsge_pv.import_declarations import cli_arg_parser as import_declarations_cli
 from ocsge_pv.pair_from_sources import cli_arg_parser as pair_from_sources_cli
 
-# -- MAIN FUNCTION --
+
 def main() -> int:
     """Main routine, entrypoint for the program
-    
+
     Returns:
         int: shell exit code of the execution
     """
@@ -37,12 +35,17 @@ def main() -> int:
         try:
             pair_from_sources_cli()
         except SystemExit:
+            print("\n-----------------------------")
+        print("-------- delete_data --------\n")
+        try:
+            delete_data_cli()
+        except SystemExit:
             print("")
         return 0
     finally:
         sys.argv = original_sys_argv
 
-# -- MAIN SCRIPT --
-if (__name__ == "__main__"):
+
+if __name__ == "__main__":
     exit_code = main()
     sys.exit(exit_code)
