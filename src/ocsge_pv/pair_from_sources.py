@@ -27,7 +27,6 @@ import argparse
 import json
 import logging
 import os
-import re
 import sys
 import traceback
 from copy import deepcopy
@@ -38,6 +37,8 @@ import jsonschema
 import psycopg
 from osgeo import ogr, osr
 from psycopg import sql
+
+from ocsge_pv import delete_data
 
 # -- GLOBALS --
 
@@ -68,13 +69,9 @@ def cli_arg_parser() -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(
         prog=NAME,
-        description=(
-            "Establishes links between declaration data and remote detection data"
-        ),
+        description=("Establishes links between declaration data and remote detection data"),
     )
-    parser.add_argument(
-        "path", type=Path, help="the path of the configuration file for %(prog)s"
-    )
+    parser.add_argument("path", type=Path, help="the path of the configuration file for %(prog)s")
     parser.add_argument(
         "-v", "--verbose", dest="verbose", action="store_true", help="output more logs"
     )
@@ -97,55 +94,10 @@ def delete_before_matching(output_conf: dict, id_set: set[dict]) -> None:
         output_conf (dict): output database information
         id_set (set[int]): set of targeted declarations' identifiers
     """
-    deleted_dec_count = 0
-    deleted_pair_count = 0
-    with psycopg.connect(output_conf["_pg_string"]) as conn:
-        cur = conn.cursor()
-        try:
-            with conn.transaction():
-                for fid in id_set:
-                    logger.log(
-                        TRACE, f"Deleting pairs associated with declaration {fid}."
-                    )
-                    cur.execute(
-                        sql.SQL(
-                            "DELETE FROM {table} WHERE {dec_key} = {dec_value}"
-                        ).format(
-                            table=sql.Identifier(
-                                output_conf["schema"],
-                                output_conf["tables"]["links"],
-                            ),
-                            dec_key=sql.Identifier("declaration_id"),
-                            dec_value=sql.Placeholder("dec_value"),
-                        ),
-                        {"dec_value": fid},
-                    )
-                    pair_message = cur.statusmessage
-                    pair_count_match = re.match(r"DELETE +([0-9]+)", pair_message)
-                    pair_count_str = pair_count_match.group(1)
-                    pair_count_int = int(pair_count_str)
-                    deleted_pair_count += pair_count_int
-                    logger.log(TRACE, f"Deleting declaration {fid}.")
-                    cur.execute(
-                        sql.SQL(
-                            "DELETE FROM {table} WHERE {dec_key} = {dec_value}"
-                        ).format(
-                            table=sql.Identifier(
-                                output_conf["schema"],
-                                output_conf["tables"]["declarations"],
-                            ),
-                            dec_key=sql.Identifier("id_dossier"),
-                            dec_value=sql.Placeholder("dec_value"),
-                        ),
-                        {"dec_value": fid},
-                    )
-                    deleted_dec_count += 1
-        except Exception as exc:
-            logger.error(traceback.format_exc())
-            conn.rollback()
-            raise exc
-    logger.debug(f"{deleted_dec_count} declarations deleted from database.")
-    logger.debug(f"{deleted_pair_count} linked pairs deleted from database.")
+    try:
+        delete_data.delete_declarations(output_conf, id_set)
+    except Exception as exc:
+        raise exc
 
 
 def delete_after_matching(output_conf: dict, link_set: set[tuple]) -> None:
@@ -157,35 +109,17 @@ def delete_after_matching(output_conf: dict, link_set: set[tuple]) -> None:
             (declaration_id: int, detection_id: int)
     """
     deleted_pairs_count = 0
-    with psycopg.connect(output_conf["_pg_string"]) as conn:
-        cur = conn.cursor()
-        try:
-            with conn.transaction():
-                for link_tuple in link_set:
-                    logger.log(TRACE, f"Deleting pair {link_tuple}.")
-                    cur.execute(
-                        sql.SQL(
-                            "DELETE FROM {table} WHERE {dec_key} = %s AND {det_key} = %s"
-                        ).format(
-                            table=sql.Identifier(
-                                output_conf["schema"],
-                                output_conf["tables"]["links"],
-                            ),
-                            dec_key=sql.Identifier("declaration_id"),
-                            det_key=sql.Identifier("detection_id"),
-                        ),
-                        link_tuple,
-                    )
-                    message = cur.statusmessage
-                    count_match = re.match(r"DELETE +([0-9]+)", message)
-                    count_str = count_match.group(1)
-                    count_int = int(count_str)
-                    deleted_pairs_count += count_int
-        except Exception as exc:
-            logger.error(traceback.format_exc())
-            conn.rollback()
-            raise exc
-    logger.debug(f"{deleted_pairs_count} pairs deleted from database.")
+    pairs_list = []
+    for link_tuple in link_set:
+        pair = {
+            "declaration": link_tuple[0],
+            "detection": link_tuple[1],
+        }
+        pairs_list.append(pair)
+    try:
+        delete_data.delete_pairs(output_conf, pairs_list)
+    except Exception as exc:
+        raise exc
 
 
 def insert_new(output_conf: dict, link_set: set[tuple]) -> None:
@@ -382,9 +316,7 @@ def match_dec_to_det(
                     dec_geom.Transform(transform)
                 if det_geom.Intersects(dec_geom):
                     creation_iso = dec_feature.GetField("creation").replace("/", "-")
-                    installation_iso = dec_feature.GetField("date_insta").replace(
-                        "/", "-"
-                    )
+                    installation_iso = dec_feature.GetField("date_insta").replace("/", "-")
                     linked_dec_dict[dec_feature.GetFID()] = {
                         "creation": datetime.fromisoformat(creation_iso),
                         "installation": datetime.fromisoformat(installation_iso),
@@ -401,10 +333,7 @@ def match_dec_to_det(
                     "creation": creation_dt,
                     "installation": installation_dt,
                 }
-            if (
-                latest_fid is None
-                or linked_dec_dict[latest_fid]["creation"] < creation_dt
-            ):
+            if latest_fid is None or linked_dec_dict[latest_fid]["creation"] < creation_dt:
                 latest_fid = dec_fid
         for dec_fid in list(linked_dec_dict):
             # (declaration_fid, detection_fid) tuple
@@ -440,18 +369,14 @@ def main() -> int:
         elif cli_args.verbose:
             logger.setLevel(logging.DEBUG)
             log_level_description = "verbose"
-        logger.info(
-            f"Logging level: '{logger.getEffectiveLevel()}' ({log_level_description})"
-        )
+        logger.info(f"Logging level: '{logger.getEffectiveLevel()}' ({log_level_description})")
         # Read configuration
         logger.info("Loading configuration...")
         configuration = load_configuration(cli_args.path)
         # OGR layers and spatial references
         logger.info("Preparing OGR entities...")
         latlon_sr_name_list = ["WGS 84"]
-        ogr_pg_connection = ogr.Open(
-            "PG: " + configuration["main_database"]["_pg_string"]
-        )
+        ogr_pg_connection = ogr.Open("PG: " + configuration["main_database"]["_pg_string"])
         ## Declarations layer
         declaration_table = ".".join(
             (
@@ -520,13 +445,11 @@ def main() -> int:
             coordinates_transformation = osr.CoordinateTransformation(
                 declaration_osr_sr, detection_osr_sr
             )
-            need_coordinates_swap = (
-                is_detection_sr_latlon and not is_declaration_sr_latlon
-            ) or (is_declaration_sr_latlon and not is_detection_sr_latlon)
+            need_coordinates_swap = (is_detection_sr_latlon and not is_declaration_sr_latlon) or (
+                is_declaration_sr_latlon and not is_detection_sr_latlon
+            )
             if need_coordinates_swap:
-                logger.debug(
-                    "Axis order swapping is necessary for this transformation."
-                )
+                logger.debug("Axis order swapping is necessary for this transformation.")
         # Check for duplicates in declarations
         logger.info("Checking for conflicting declarations...")
         dupe_dec_set = check_declared_parcels(declaration_ogr_layer)

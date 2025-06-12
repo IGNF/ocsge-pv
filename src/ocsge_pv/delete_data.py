@@ -19,8 +19,6 @@ This file contains the following functions :
     * main - main function of the script
 """
 
-# -- IMPORTS --
-
 import argparse
 import json
 import logging
@@ -30,8 +28,8 @@ from copy import deepcopy
 from pathlib import Path
 
 import jsonschema
-
-# -- GLOBALS --
+import psycopg
+from psycopg import sql
 
 NAME = "delete_data"
 logging.basicConfig(
@@ -67,13 +65,6 @@ def cli_arg_parser() -> argparse.Namespace:
     )
     parser.add_argument(
         "-v", "--verbose", dest="verbose", action="store_true", help="output more logs"
-    )
-    parser.add_argument(
-        "-vv",
-        "--very_verbose",
-        dest="very_verbose",
-        action="store_true",
-        help="output even more logs",
     )
     return parser.parse_args()
 
@@ -199,5 +190,218 @@ def get_ids_from_cli(arguments: argparse.Namespace) -> dict:
     return extracted_dict
 
 
-def main():
-    return 0
+# -- PROCESSING FUNCTIONS --
+
+
+def combine_id_inventories(conf_inventory: dict, cli_inventory: dict) -> dict:
+    """Combine inventories from configuration and CLI arguments.
+
+    Args:
+        conf_inventory (dict): ids inventory from configuration
+        cli_inventory (dict): ids inventory from CLI arguments
+
+    Returns:
+        dict: combined deletions' ids inventory
+    """
+    result = deepcopy(conf_inventory)
+    for item in cli_inventory["declaration"]:
+        result["declaration"].add(item)
+    for item in cli_inventory["detection"]:
+        result["detection"].add(item)
+    for item in cli_inventory["pairs"]:
+        if item not in result["pairs"]:
+            result["pairs"].append(item)
+    return result
+
+
+def delete_declarations(db_info: dict, declarations: set) -> None:
+    """Delete declarations and associated pairs
+
+    Args:
+        db_info (dict): database connection and table information
+        declarations (set): target declarations ids list
+
+    Raises:
+        Exception: unidentified error, mostly in databse interactions
+    """
+    logger.info("Deleting declarations and associated pairs")
+    deleted_declarations_count = 0
+    deleted_pairs_count = 0
+    with psycopg.connect(db_info["_pg_string"]) as conn:
+        try:
+            cur = conn.cursor()
+            with conn.transaction():
+                cur.execute(
+                    sql.SQL("DELETE FROM {table} WHERE declaration_id IN %s").format(
+                        table=sql.Identifier(
+                            db_info["schema"],
+                            db_info["tables"]["links"],
+                        )
+                    ),
+                    declarations,
+                )
+                message = cur.statusmessage
+                count_match = re.match(r"DELETE +([0-9]+)", message)
+                count_str = count_match.group(1)
+                deleted_pairs_count = int(count_str)
+
+                cur.execute(
+                    sql.SQL("DELETE FROM {table} WHERE declaration_id IN %s").format(
+                        table=sql.Identifier(
+                            db_info["schema"],
+                            db_info["tables"]["declarations"],
+                        )
+                    ),
+                    declarations,
+                )
+                message = cur.statusmessage
+                count_match = re.match(r"DELETE +([0-9]+)", message)
+                count_str = count_match.group(1)
+                deleted_declarations_count = int(count_str)
+        except Exception as exc:
+            logger.error(traceback.format_exc())
+            conn.rollback()
+            raise exc
+    logger.info(
+        f"{deleted_declarations_count} declarations and {deleted_pairs_count} pairs deleted."
+    )
+
+
+def delete_detections(db_info: dict, detections: set) -> None:
+    """Delete detections and associated pairs
+
+    Args:
+        db_info (dict): database connection and table information
+        detections (set): target detections ids list
+
+    Raises:
+        Exception: unidentified error, mostly in databse interactions
+    """
+    logger.info("Deleting detections and associated pairs")
+    deleted_detections_count = 0
+    deleted_pairs_count = 0
+    with psycopg.connect(db_info["_pg_string"]) as conn:
+        try:
+            cur = conn.cursor()
+            with conn.transaction():
+                cur.execute(
+                    sql.SQL("DELETE FROM {table} WHERE declaration_id IN %s").format(
+                        table=sql.Identifier(
+                            db_info["schema"],
+                            db_info["tables"]["links"],
+                        )
+                    ),
+                    detections,
+                )
+                message = cur.statusmessage
+                count_match = re.match(r"DELETE +([0-9]+)", message)
+                count_str = count_match.group(1)
+                deleted_pairs_count = int(count_str)
+
+                cur.execute(
+                    sql.SQL("DELETE FROM {table} WHERE declaration_id IN %s").format(
+                        table=sql.Identifier(
+                            db_info["schema"],
+                            db_info["tables"]["detections"],
+                        )
+                    ),
+                    detections,
+                )
+                message = cur.statusmessage
+                count_match = re.match(r"DELETE +([0-9]+)", message)
+                count_str = count_match.group(1)
+                deleted_detections_count = int(count_str)
+        except Exception as exc:
+            logger.error(traceback.format_exc())
+            conn.rollback()
+            raise exc
+    logger.info(f"{deleted_detections_count} detections and {deleted_pairs_count} pairs deleted.")
+
+
+def delete_pairs(db_info: dict, pairs: list) -> None:
+    """Delete pairs
+
+    Args:
+        db_info (dict): database connection and table information
+        pairs (list): target id pairs list
+
+    Raises:
+        Exception: unidentified error, mostly in databse interactions
+    """
+    logger.info("Deleting explicit pairs")
+    deleted_pairs_count = 0
+    with psycopg.connect(db_info["_pg_string"]) as conn:
+        try:
+            cur = conn.cursor()
+            with conn.transaction():
+                for item in pairs:
+                    cur.execute(
+                        sql.SQL(
+                            "DELETE FROM {table} WHERE declaration_id=%s AND detection_id=%s"
+                        ).format(
+                            table=sql.Identifier(
+                                db_info["schema"],
+                                db_info["tables"]["links"],
+                            )
+                        ),
+                        (item["declaration", item["detection"]],),
+                    )
+                    message = cur.statusmessage
+                    count_match = re.match(r"DELETE +([0-9]+)", message)
+                    count_str = count_match.group(1)
+                    deleted_pairs_count += int(count_str)
+        except Exception as exc:
+            logger.error(traceback.format_exc())
+            conn.rollback()
+            raise exc
+    logger.info(f"{deleted_pairs_count} pairs deleted.")
+
+
+# -- MAIN FUNCTION --
+
+
+def main() -> int:
+    """Main routine, entrypoint for the program
+
+    Args:
+        path (str): path to the configuration file
+            (implicit, contained in sys.argv[])
+
+    Returns:
+        int: shell exit code of the execution
+    """
+    try:
+        logger.info("Start of discrete data deletion.")
+        cli_args = cli_arg_parser()
+        log_level_description = "normal"
+        if cli_args.verbose:
+            logger.setLevel(logging.DEBUG)
+            log_level_description = "verbose"
+        logger.info(f"Logging level: '{logger.getEffectiveLevel()}' ({log_level_description})")
+        # Read configuration
+        logger.info("Loading configuration...")
+        configuration = load_configuration(cli_args.path)
+        # Compute deletion ids lists
+        # Note that deleting a declaration or a detection will also delete all related pairs
+        logger.info("Computing initial deletions lists...")
+        cli_id_dict = get_ids_from_cli(cli_args)
+        inventory = combine_id_inventories(configuration["to_delete"], cli_id_dict)
+        # Realise the deletions from the database
+        logger.info("Deleting elements from database...")
+        delete_declarations(configuration["main_database"], inventory["declarations"])
+        delete_detections(configuration["main_database"], inventory["detections"])
+        delete_pairs(configuration["main_database"], inventory["pairs"])
+        # Finished
+        logger.info("End of discrete data deletion.")
+        return 0
+    except Exception:
+        logger.error(traceback.format_exc())
+        return 1
+
+
+# -- MAIN SCRIPT --
+
+
+if __name__ == "__main__":
+    exit_code = main()
+    sys.exit(exit_code)

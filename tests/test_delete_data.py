@@ -87,6 +87,12 @@ class TestConfigurationLoader(TestCase):
         with open(f_config_loaded_path, encoding="utf-8") as file:
             f_config_loaded_raw = file.read()
         self.f_config_loaded_obj = json.loads(f_config_loaded_raw)
+        self.f_config_loaded_obj["to_delete"]["declarations"] = set(
+            self.f_config_loaded_obj["to_delete"]["declarations"]
+        )
+        self.f_config_loaded_obj["to_delete"]["detections"] = set(
+            self.f_config_loaded_obj["to_delete"]["detections"]
+        )
         ## Configuration file, invalid
         self.f_config_nok_raw = ""
         with open(self.f_config_nok_path, encoding="utf-8") as file:
@@ -94,13 +100,13 @@ class TestConfigurationLoader(TestCase):
         ## Configuration object, invalid
         self.f_config_nok_obj = json.loads(self.f_config_nok_raw)
 
-        ## Configuration file path
+        ## Configuration schema path
         self.f_config_schema_path = Path(OCSGE_PV_RESOURCE_DIR, "delete_data_config.schema.json")
-        ## Configuration file, nominal
+        ## Schema file, nominal
         self.f_config_schema_raw = ""
         with open(self.f_config_schema_path, encoding="utf-8") as file:
             self.f_config_schema_raw = file.read()
-        ## Configuration object, nominal
+        ## Schema object, nominal
         self.f_config_schema_obj = json.loads(self.f_config_schema_raw)
 
     @patch("jsonschema.validate")
