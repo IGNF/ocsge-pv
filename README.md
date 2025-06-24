@@ -19,12 +19,12 @@ La configuration se présente sous la forme d'un fichier json. Les schémas de v
 
 ## Installation
 (Commandes exécutées depuis la racine du projet.)
-Diffrentes méthodes sont possibles
+Différentes méthodes sont possibles
 
 ### Depuis le dépôt d'images docker
 **En construction**
 
-### Installation depuis python
+### Installation depuis apt et python sur un OS basé sur Debian
 (Non testée sur les versions de python strictement inférieures à 3.11)
 
 ```bash

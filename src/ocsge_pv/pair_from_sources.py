@@ -69,9 +69,13 @@ def cli_arg_parser() -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(
         prog=NAME,
-        description=("Establishes links between declaration data and remote detection data"),
+        description=(
+            "Establishes links between declaration data and remote detection data"
+        ),
     )
-    parser.add_argument("path", type=Path, help="the path of the configuration file for %(prog)s")
+    parser.add_argument(
+        "path", type=Path, help="the path of the configuration file for %(prog)s"
+    )
     parser.add_argument(
         "-v", "--verbose", dest="verbose", action="store_true", help="output more logs"
     )
@@ -219,21 +223,28 @@ def check_declared_parcels(data_layer: ogr.Layer) -> set[int]:
     Returns:
         set: id sequence for declarations to delete
     """
+    # Create the set of id to delete
+    deletion_set = set()
     # Create a parcels dict with a more useful structure
     parcels_dict = {}
     for feature in data_layer:
         feature_id = feature.GetFID()
-        parcels_list = feature.GetField("num_parcelles").split(";")
-        feature_year = feature.GetFieldAsDateTime("date_insta")[0]
-        feature_creation_date = feature.GetField("creation").replace("/", "-")
-        for parcel_idu in parcels_list:
-            if parcel_idu not in parcels_dict:
-                parcels_dict[parcel_idu] = {}
-            if feature_year not in parcels_dict[parcel_idu]:
-                parcels_dict[parcel_idu][feature_year] = {}
-            parcels_dict[parcel_idu][feature_year][feature_creation_date] = feature_id
-    # Create and fill the set of id to delete
-    deletion_set = set()
+        parcels_string = feature.GetField("num_parcelles")
+        if parcels_string is None or parcels_string == "":
+            deletion_set.add(feature_id)
+        else:
+            parcels_list = parcels_string.split(";")
+            feature_year = feature.GetFieldAsDateTime("date_insta")[0]
+            feature_creation_date = feature.GetField("creation").replace("/", "-")
+            for parcel_idu in parcels_list:
+                if parcel_idu not in parcels_dict:
+                    parcels_dict[parcel_idu] = {}
+                if feature_year not in parcels_dict[parcel_idu]:
+                    parcels_dict[parcel_idu][feature_year] = {}
+                parcels_dict[parcel_idu][feature_year][
+                    feature_creation_date
+                ] = feature_id
+    # Fill the set of id to delete
     for idu in list(parcels_dict):
         for year in list(parcels_dict[idu]):
             # Check declarations for a specific parcel and installation year
@@ -316,7 +327,9 @@ def match_dec_to_det(
                     dec_geom.Transform(transform)
                 if det_geom.Intersects(dec_geom):
                     creation_iso = dec_feature.GetField("creation").replace("/", "-")
-                    installation_iso = dec_feature.GetField("date_insta").replace("/", "-")
+                    installation_iso = dec_feature.GetField("date_insta").replace(
+                        "/", "-"
+                    )
                     linked_dec_dict[dec_feature.GetFID()] = {
                         "creation": datetime.fromisoformat(creation_iso),
                         "installation": datetime.fromisoformat(installation_iso),
@@ -333,7 +346,10 @@ def match_dec_to_det(
                     "creation": creation_dt,
                     "installation": installation_dt,
                 }
-            if latest_fid is None or linked_dec_dict[latest_fid]["creation"] < creation_dt:
+            if (
+                latest_fid is None
+                or linked_dec_dict[latest_fid]["creation"] < creation_dt
+            ):
                 latest_fid = dec_fid
         for dec_fid in list(linked_dec_dict):
             # (declaration_fid, detection_fid) tuple
@@ -369,14 +385,18 @@ def main() -> int:
         elif cli_args.verbose:
             logger.setLevel(logging.DEBUG)
             log_level_description = "verbose"
-        logger.info(f"Logging level: '{logger.getEffectiveLevel()}' ({log_level_description})")
+        logger.info(
+            f"Logging level: '{logger.getEffectiveLevel()}' ({log_level_description})"
+        )
         # Read configuration
         logger.info("Loading configuration...")
         configuration = load_configuration(cli_args.path)
         # OGR layers and spatial references
         logger.info("Preparing OGR entities...")
         latlon_sr_name_list = ["WGS 84"]
-        ogr_pg_connection = ogr.Open("PG: " + configuration["main_database"]["_pg_string"])
+        ogr_pg_connection = ogr.Open(
+            "PG: " + configuration["main_database"]["_pg_string"]
+        )
         ## Declarations layer
         declaration_table = ".".join(
             (
@@ -445,11 +465,13 @@ def main() -> int:
             coordinates_transformation = osr.CoordinateTransformation(
                 declaration_osr_sr, detection_osr_sr
             )
-            need_coordinates_swap = (is_detection_sr_latlon and not is_declaration_sr_latlon) or (
-                is_declaration_sr_latlon and not is_detection_sr_latlon
-            )
+            need_coordinates_swap = (
+                is_detection_sr_latlon and not is_declaration_sr_latlon
+            ) or (is_declaration_sr_latlon and not is_detection_sr_latlon)
             if need_coordinates_swap:
-                logger.debug("Axis order swapping is necessary for this transformation.")
+                logger.debug(
+                    "Axis order swapping is necessary for this transformation."
+                )
         # Check for duplicates in declarations
         logger.info("Checking for conflicting declarations...")
         dupe_dec_set = check_declared_parcels(declaration_ogr_layer)
