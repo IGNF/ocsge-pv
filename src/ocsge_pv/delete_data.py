@@ -23,6 +23,7 @@ import argparse
 import json
 import logging
 import os
+import re
 import traceback
 from copy import deepcopy
 from pathlib import Path
@@ -56,9 +57,13 @@ def cli_arg_parser() -> argparse.Namespace:
         prog=NAME,
         description=("Deletes photovoltaic data objects from database"),
     )
-    parser.add_argument("path", type=Path, help="the path of the configuration file for %(prog)s")
+    parser.add_argument(
+        "path", type=Path, help="the path of the configuration file for %(prog)s"
+    )
     parser.add_argument("--detections", help="Comma separated list of detections' ids")
-    parser.add_argument("--declarations", help="Comma separated list of declarations' ids")
+    parser.add_argument(
+        "--declarations", help="Comma separated list of declarations' ids"
+    )
     parser.add_argument(
         "--pairs",
         help="Comma separated list of id pairs. Each pair has the form '<detection_id>-<declaration_id>'",
@@ -95,7 +100,9 @@ def load_configuration(path: Path) -> dict:
         schema = json.loads(schema_str)
         jsonschema.validate(source_configuration, schema)
         modified_configuration = {}
-        modified_configuration["main_database"] = deepcopy(source_configuration["main_database"])
+        modified_configuration["main_database"] = deepcopy(
+            source_configuration["main_database"]
+        )
         modified_configuration["main_database"]["_pg_string"] = (
             "host="
             + modified_configuration["main_database"]["host"]
@@ -127,7 +134,10 @@ def load_configuration(path: Path) -> dict:
             modified_configuration["to_delete"]["detections"] = set(
                 source_configuration["to_delete"]["detections"]
             )
-        if "to_delete" in source_configuration and "pairs" in source_configuration["to_delete"]:
+        if (
+            "to_delete" in source_configuration
+            and "pairs" in source_configuration["to_delete"]
+        ):
             modified_configuration["to_delete"]["pairs"] = deepcopy(
                 source_configuration["to_delete"]["pairs"]
             )
@@ -232,13 +242,18 @@ def delete_declarations(db_info: dict, declarations: set) -> None:
             cur = conn.cursor()
             with conn.transaction():
                 cur.execute(
-                    sql.SQL("DELETE FROM {table} WHERE declaration_id IN %s").format(
+                    sql.SQL(
+                        "DELETE FROM {table} WHERE declaration_id IN ({id_list})"
+                    ).format(
                         table=sql.Identifier(
                             db_info["schema"],
                             db_info["tables"]["links"],
-                        )
+                        ),
+                        id_list=sql.SQL(", ").join(
+                            sql.Placeholder() * len(declarations)
+                        ),
                     ),
-                    declarations,
+                    tuple(declarations),
                 )
                 message = cur.statusmessage
                 count_match = re.match(r"DELETE +([0-9]+)", message)
@@ -246,13 +261,18 @@ def delete_declarations(db_info: dict, declarations: set) -> None:
                 deleted_pairs_count = int(count_str)
 
                 cur.execute(
-                    sql.SQL("DELETE FROM {table} WHERE declaration_id IN %s").format(
+                    sql.SQL(
+                        "DELETE FROM {table} WHERE id_dossier IN ({id_list})"
+                    ).format(
                         table=sql.Identifier(
                             db_info["schema"],
                             db_info["tables"]["declarations"],
-                        )
+                        ),
+                        id_list=sql.SQL(", ").join(
+                            sql.Placeholder() * len(declarations)
+                        ),
                     ),
-                    declarations,
+                    tuple(declarations),
                 )
                 message = cur.statusmessage
                 count_match = re.match(r"DELETE +([0-9]+)", message)
@@ -285,13 +305,16 @@ def delete_detections(db_info: dict, detections: set) -> None:
             cur = conn.cursor()
             with conn.transaction():
                 cur.execute(
-                    sql.SQL("DELETE FROM {table} WHERE declaration_id IN %s").format(
+                    sql.SQL(
+                        "DELETE FROM {table} WHERE detection_id IN ({id_list})"
+                    ).format(
                         table=sql.Identifier(
                             db_info["schema"],
                             db_info["tables"]["links"],
-                        )
+                        ),
+                        id_list=sql.SQL(", ").join(sql.Placeholder() * len(detections)),
                     ),
-                    detections,
+                    tuple(detections),
                 )
                 message = cur.statusmessage
                 count_match = re.match(r"DELETE +([0-9]+)", message)
@@ -299,13 +322,14 @@ def delete_detections(db_info: dict, detections: set) -> None:
                 deleted_pairs_count = int(count_str)
 
                 cur.execute(
-                    sql.SQL("DELETE FROM {table} WHERE declaration_id IN %s").format(
+                    sql.SQL("DELETE FROM {table} WHERE id_v2 IN ({id_list})").format(
                         table=sql.Identifier(
                             db_info["schema"],
                             db_info["tables"]["detections"],
-                        )
+                        ),
+                        id_list=sql.SQL(", ").join(sql.Placeholder() * len(detections)),
                     ),
-                    detections,
+                    tuple(detections),
                 )
                 message = cur.statusmessage
                 count_match = re.match(r"DELETE +([0-9]+)", message)
@@ -315,7 +339,9 @@ def delete_detections(db_info: dict, detections: set) -> None:
             logger.error(traceback.format_exc())
             conn.rollback()
             raise exc
-    logger.info(f"{deleted_detections_count} detections and {deleted_pairs_count} pairs deleted.")
+    logger.info(
+        f"{deleted_detections_count} detections and {deleted_pairs_count} pairs deleted."
+    )
 
 
 def delete_pairs(db_info: dict, pairs: list) -> None:
@@ -377,7 +403,9 @@ def main() -> int:
         if cli_args.verbose:
             logger.setLevel(logging.DEBUG)
             log_level_description = "verbose"
-        logger.info(f"Logging level: '{logger.getEffectiveLevel()}' ({log_level_description})")
+        logger.info(
+            f"Logging level: '{logger.getEffectiveLevel()}' ({log_level_description})"
+        )
         # Read configuration
         logger.info("Loading configuration...")
         configuration = load_configuration(cli_args.path)
