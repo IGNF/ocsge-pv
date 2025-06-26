@@ -116,24 +116,26 @@ def load_configuration(path: Path) -> dict:
             + modified_configuration["main_database"]["password"]
         )
         modified_configuration["to_delete"] = {
-            "declarations": set(),
-            "detections": set(),
+            "declarations": [],
+            "detections": [],
             "pairs": [],
         }
         if (
             "to_delete" in source_configuration
             and "declarations" in source_configuration["to_delete"]
         ):
-            modified_configuration["to_delete"]["declarations"] = set(
+            modified_configuration["to_delete"]["declarations"] = deepcopy(
                 source_configuration["to_delete"]["declarations"]
             )
+            modified_configuration["to_delete"]["declarations"].sort()
         if (
             "to_delete" in source_configuration
             and "detections" in source_configuration["to_delete"]
         ):
-            modified_configuration["to_delete"]["detections"] = set(
+            modified_configuration["to_delete"]["detections"] = deepcopy(
                 source_configuration["to_delete"]["detections"]
             )
+            modified_configuration["to_delete"]["detections"].sort()
         if (
             "to_delete" in source_configuration
             and "pairs" in source_configuration["to_delete"]
@@ -159,8 +161,8 @@ def get_ids_from_cli(arguments: argparse.Namespace) -> dict:
     Returns:
         dict: extracted ids, same format as in the configuration
             {
-                "declarations": set(int),
-                "detections": set(int),
+                "declarations": list[int],
+                "detections": list[int],
                 "pairs": [
                     {
                         "declaration": int,
@@ -171,8 +173,8 @@ def get_ids_from_cli(arguments: argparse.Namespace) -> dict:
             }
     """
     try:
-        dec_set = set()
-        det_set = set()
+        dec_list = []
+        det_list = []
         pair_list = []
         if arguments.pairs is not None:
             for pair_str in arguments.pairs.split(","):
@@ -185,19 +187,21 @@ def get_ids_from_cli(arguments: argparse.Namespace) -> dict:
                     pair_list.append(pair_obj)
         if arguments.declarations is not None:
             for declaration_str in arguments.declarations.split(","):
-                dec_set.add(int(declaration_str))
+                dec_list.append(int(declaration_str))
+            dec_list.sort()
         if arguments.detections is not None:
             for detection_str in arguments.detections.split(","):
-                det_set.add(int(detection_str))
+                det_list.append(int(detection_str))
+            det_list.sort()
     except Exception as exc:
         logger.error(traceback.format_exc())
         raise exc
     extracted_dict = {
-        "declarations": dec_set,
-        "detection": det_set,
+        "declarations": dec_list,
+        "detections": det_list,
         "pairs": pair_list,
     }
-    return extracted_dict
+    return deepcopy(extracted_dict)
 
 
 # -- PROCESSING FUNCTIONS --
@@ -213,14 +217,32 @@ def combine_id_inventories(conf_inventory: dict, cli_inventory: dict) -> dict:
     Returns:
         dict: combined deletions' ids inventory
     """
-    result = deepcopy(conf_inventory)
-    for item in cli_inventory["declaration"]:
-        result["declaration"].add(item)
-    for item in cli_inventory["detection"]:
-        result["detection"].add(item)
+    logger.info(
+        f"Deletions inventory from configuration file: {json.dumps(conf_inventory)}"
+    )
+    logger.info(f"deletions inventory from CLI arguments: {json.dumps(cli_inventory)}")
+    dec_set = set(conf_inventory["declarations"])
+    det_set = set(conf_inventory["detections"])
+    pairs_list = deepcopy(conf_inventory["pairs"])
+    temp_result = {
+        "declarations": set(conf_inventory["declarations"]),
+        "detections": set(conf_inventory["detections"]),
+        "pairs": deepcopy(conf_inventory["pairs"]),
+    }
+    for item in cli_inventory["declarations"]:
+        dec_set.add(item)
+    for item in cli_inventory["detections"]:
+        det_set.add(item)
     for item in cli_inventory["pairs"]:
         if item not in result["pairs"]:
-            result["pairs"].append(item)
+            pairs_list.append(item)
+    result = {
+        "declarations": list(dec_set),
+        "detections": list(det_set),
+        "pairs": pairs_list,
+    }
+    result["declarations"].sort()
+    result["detections"].sort()
     return result
 
 
@@ -370,7 +392,10 @@ def delete_pairs(db_info: dict, pairs: list) -> None:
                                 db_info["tables"]["links"],
                             )
                         ),
-                        (item["declaration", item["detection"]],),
+                        (
+                            item["declaration"],
+                            item["detection"],
+                        ),
                     )
                     message = cur.statusmessage
                     count_match = re.match(r"DELETE +([0-9]+)", message)
