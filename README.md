@@ -88,23 +88,21 @@ docker run -v <conf_host_filepath>:<conf_container_filepath> local/ocsge-pv <exe
 | supprime | bool |  |
 
 #### Autres exécutables
-Même chose sans les colonnes `dern_modif`, `archive`, `supprime`.
+Même chose sans les colonnes `dern_modif`, `archive`, `supprime`, non utilisées par ces exécutables.
 Si une base de données dédiée est utilisée pour extraire les données du service "démarches simplifiées", alors ces colonnes permettent le filtrage des données à transférer vers la base de données de travail et de diffusion. (Celle utilisée par les exécutables autres que "import_declarations".)
 
 ### Table des données de télédétection
 | Colonne | Type | Contraintes |
 | :------ | :--- | :---------- |
 | id_v2 | bigint | PRIMARY KEY |
-| id | bigint |  |
 | long | decimal(11, 8) |  |
 | lat | decimal(11, 8) |  |
 | surf_parc | decimal(17, 4) |  |
-| nb_pann | int |  |
-| nb_const | int |  |
+| flottant | bool |  |
+| agrivolt | bool |  |
 | insee_com | text |  |
 | nom_com | text |  |
 | millesime | int |  |
-| dern_modif | timestamp |  |
 | geom | geometry(MULTIPOLYGON,2154) |  |
 
 ### Table de liens entre déclarations et détections
