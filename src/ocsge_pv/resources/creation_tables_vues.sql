@@ -88,16 +88,14 @@ CREATE TABLE IF NOT EXISTS "declaration" (
 -- Detections as used by the pairing tool
 CREATE TABLE IF NOT EXISTS "detection" (
     "id_v2" bigint PRIMARY KEY,
-    "id" bigint,
     "long" decimal(11, 8),
     "lat" decimal(11, 8),
     "surf_parc" decimal(17, 4),
-    "nb_pann" int,
-    "nb_const" int,
+    "flottant" bool,
+    "agrivolt" bool,
     "insee_com" text,
     "nom_com" text,
     "millesime" int,
-    "dern_modif" timestamp,
     "geom" geometry(MULTIPOLYGON,2154)
 );
 
@@ -115,12 +113,11 @@ CREATE OR REPLACE VIEW "donnees_agregees" AS
         "detection"."long",
         "detection"."lat",
         "detection"."surf_parc",
-        "detection"."nb_pann",
-        "detection"."nb_const",
+        "detection"."flottant",
+        "detection"."agrivolt",
         "detection"."insee_com",
         "detection"."nom_com",
         "detection"."millesime",
-        "detection"."dern_modif",
         "declaration"."siret_port",
         "declaration"."ref_urba",
         "declaration"."type_proj",
