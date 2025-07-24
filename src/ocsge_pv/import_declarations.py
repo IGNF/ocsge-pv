@@ -360,7 +360,7 @@ def format_feature(in_data: dict) -> dict:
                 ):
                     field_name = "num_parcelles"
                     geometry = ogr.CreateGeometryFromWkt(
-                        "MULTIPOLYGON EMPTY", SOURCE_SRS
+                        "GEOMETRYCOLLECTION EMPTY", SOURCE_SRS
                     )
                     for geo_area in champ["geoAreas"]:
                         if geo_area["source"] == "cadastre":
