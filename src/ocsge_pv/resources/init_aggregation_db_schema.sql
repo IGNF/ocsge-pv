@@ -42,8 +42,13 @@ CREATE TABLE IF NOT EXISTS "declaration" (
 );
 
 -- Detections as used by the pairing tool
+-- id is not unique as a whole : it carries across millesimes
+-- (id, millesime) pair is unique
 CREATE TABLE IF NOT EXISTS "detection" (
-    "id" bigint PRIMARY KEY,
+    "id_millesime" bigint PRIMARY KEY GENERATED ALWAYS
+        AS ( (10000000 * id) + millesime ) STORED,
+    "id" bigint NOT NULL,
+    "millesime" int NOT NULL,
     "long" decimal(11, 8),
     "lat" decimal(11, 8),
     "surf_parc" decimal(17, 4),
@@ -51,7 +56,6 @@ CREATE TABLE IF NOT EXISTS "detection" (
     "agrivolt" bool,
     "insee_com" text,
     "nom_com" text,
-    "millesime" int,
     "geom" geometry(POLYGON,2154)
 );
 
@@ -60,12 +64,15 @@ CREATE TABLE IF NOT EXISTS "declaration_detection" (
     "declaration_id" bigint REFERENCES "declaration",
     "detection_id" bigint REFERENCES "detection"
 );
-CREATE UNIQUE INDEX IF NOT EXISTS "declaration_detection_idx" ON "declaration_detection" ("declaration_id", "detection_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "declaration_detection_idx"
+    ON "declaration_detection" ("declaration_id", "detection_id")
+;
 
 -- View used as the underlying data for public diffusion
 CREATE OR REPLACE VIEW "donnees_agregees" AS
     SELECT
         "detection"."id",
+        "detection"."millesime",
         "detection"."long",
         "detection"."lat",
         "detection"."surf_parc",
@@ -73,7 +80,6 @@ CREATE OR REPLACE VIEW "donnees_agregees" AS
         "detection"."agrivolt",
         "detection"."insee_com",
         "detection"."nom_com",
-        "detection"."millesime",
         "declaration"."siret_port",
         "declaration"."ref_urba",
         "declaration"."type_proj",
@@ -102,9 +108,9 @@ CREATE OR REPLACE VIEW "donnees_agregees" AS
         "declaration"."ex_agriv",
         "declaration"."ex_techniq",
         "detection"."geom"
-    FROM "declaration"
-        INNER JOIN "declaration_detection"
+    FROM "detection"
+        LEFT OUTER JOIN "declaration_detection"
+        ON "declaration_detection"."detection_id"="detection"."id_millesime"
+        LEFT OUTER JOIN "declaration"
         ON "declaration"."id_dossier"="declaration_detection"."declaration_id"
-        RIGHT JOIN "detection"
-        ON "declaration_detection"."detection_id"="detection"."id"
 ;
