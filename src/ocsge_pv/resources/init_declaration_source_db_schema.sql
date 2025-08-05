@@ -39,8 +39,9 @@ CREATE TABLE IF NOT EXISTS "full_declaration" (
     "ex_agriv" bool,
     "ex_techniq" bool,
     "creation" timestamp (0) with time zone,
-    "geom" geometry(GEOMETRYCOLLECTION,2154),
+    "geom" geometry(MULTIPOLYGON,2154),
     "dern_modif" timestamp (0) with time zone,
     "archive" bool,
+    "statut" text,
     "supprime" bool
 );

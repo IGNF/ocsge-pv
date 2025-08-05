@@ -42,71 +42,43 @@ docker run -v <conf_host_filepath>:<conf_container_filepath> local/ocsge-pv <exe
 ```
 (Par défaut : `TZ="Europe/Paris"`)
 
-## Spécification des bases de données
-### Table des données de déclaration
-#### import_declarations
-| Colonne | Type | Contraintes |
-| :------ | :--- | :---------- |
-| id_dossier | bigint | PRIMARY KEY |
-| porteur | bool |  |
-| siret_port | char(14) |  |
-| ref_urba | text |  |
-| type_proj | text |  |
-| surf_socle | decimal(17, 4) |  |
-| etat | text |  |
-| puiss_max | int |  |
-| date_depot | date |  |
-| date_deliv | date |  |
-| date_insta | date |  |
-| duree_exp | int |  |
-| adresse | text |  |
-| num_parcelles | text |  |
-| surf_occup | decimal(17, 4) |  |
-| surf_terr | decimal(17, 4) |  |
-| localisat | text |  |
-| sol_nature | text |  |
-| sol_detail | text |  |
-| usage_terr | text |  |
-| type_agri | text |  |
-| agri_ini | text |  |
-| agri_resid | text |  |
-| ancrage | text |  |
-| cloture | text |  |
-| revetement | text |  |
-| haut_pann | decimal(6, 3) |  |
-| espacement | decimal(8, 3) |  |
-| nat_pieux | bool |  |
-| transit | bool |  |
-| agrivolt | bool |  |
-| ex_date | bool |  |
-| ex_agriv | bool |  |
-| ex_techniq | bool |  |
-| geom | geometry(MULTIPOLYGON,2154) |  |
-| creation | timestamp (0) with time zone |  |
-| dern_modif | timestamp (0) with time zone |  |
-| archive | bool |  |
-| supprime | bool |  |
+## Exemple de spécification des bases de données
+Les fichiers sql liés décrivent un exemple de cas d'utilisation avec :
+* un schéma dédié à l'import des dossiers de déclaration depuis l'APi du service "Démarches Simplifiées"
+* un schéma pour le reste des opérations (appariement des données, puis diffusion et visualisation des données appariées, etc)
 
-#### Autres exécutables
-Même chose sans les colonnes `dern_modif`, `archive`, `supprime`, non utilisées par ces exécutables.
-Si une base de données dédiée est utilisée pour extraire les données du service "démarches simplifiées", alors ces colonnes permettent le filtrage des données à transférer vers la base de données de travail et de diffusion. (Celle utilisée par les exécutables autres que "import_declarations".)
+### Données de déclarations brutes
+Voir [src/resources/init_declaration_source_db_schema.sql](./src/resources/init_declaration_source_db_schema.sql)
+Les exécutables suivants utilisent ces données :
+* `import_declarations`
 
-### Table des données de télédétection
-| Colonne | Type | Contraintes |
-| :------ | :--- | :---------- |
-| id_v2 | bigint | PRIMARY KEY |
-| long | decimal(11, 8) |  |
-| lat | decimal(11, 8) |  |
-| surf_parc | decimal(17, 4) |  |
-| flottant | bool |  |
-| agrivolt | bool |  |
-| insee_com | text |  |
-| nom_com | text |  |
-| millesime | int |  |
-| geom | geometry(MULTIPOLYGON,2154) |  |
+Toutes les colonnes citée dans le fichier SQL d'exemple sont obligatoires pour le fonctionnement des exécutables ci-dessus.
 
-### Table de liens entre déclarations et détections
-| Colonne | Type | Contraintes |
-| :------ | :--- | :---------- |
-| declaration_id | bigint | REFERENCES declaration |
-| detection_id | bigint | REFERENCES detection |
+Les colonnes suivantes sont utilisée pour filtrer l'export de données depuis cette table :
+* `accepte`
+* `dern_modif`
+* `archive`
+* `supprime`
+
+### Données de travail et de diffusion
+Voir [src/resources/init_declaration_source_db_schema.sql](./src/resources/init_aggregation_db_schema.sql)
+Les exécutables suivants utilisent ces données :
+* `pair_from_sources`
+* `delete_data`
+
+Les colonnes obligatoires pour le fonctionnement des exécutables ci-dessus sont :
+* table des déclarations :
+    * Clé primaire (identifiant unique) : `id_dossier`
+    * `creation`
+    * `date_insta`
+    * `geom`
+* table des détections
+    * Clé primaire (identifiant unique) : `id_millesime`
+        * Les valeurs dans la colonne `id` ne sont pas uniques dans la table : un même objet détecté conserve son identifiant "id" s'il est détecté sur plusieurs millésimes "millesime". C'est donc bien le couple (`id`, `millesime`) qui est unique.
+    * `millesime`
+    * `geom`
+* table de lien :
+    * toutes
+* vue agrégée : non concernée
+
+Les autres colonnes dans le fichier SQL d'exemple sont utilisées par la vue "donnees_agregees". Cette vue réalise une jointure partielle entre les tables du schéma et sert de base pour d'éventuels flux de diffusion des données agrégées/appariées. (OSGeo TMS, OGC WFS, etc)

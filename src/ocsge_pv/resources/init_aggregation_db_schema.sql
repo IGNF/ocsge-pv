@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS "declaration" (
     "ex_agriv" bool,
     "ex_techniq" bool,
     "creation" timestamp (0) with time zone,
-    "geom" geometry(GEOMETRYCOLLECTION,2154)
+    "geom" geometry(MULTIPOLYGON,2154)
 );
 
 -- Detections as used by the pairing tool
