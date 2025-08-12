@@ -87,12 +87,6 @@ class TestConfigurationLoader(TestCase):
         with open(f_config_loaded_path, encoding="utf-8") as file:
             f_config_loaded_raw = file.read()
         self.f_config_loaded_obj = json.loads(f_config_loaded_raw)
-        self.f_config_loaded_obj["to_delete"]["declarations"] = set(
-            self.f_config_loaded_obj["to_delete"]["declarations"]
-        )
-        self.f_config_loaded_obj["to_delete"]["detections"] = set(
-            self.f_config_loaded_obj["to_delete"]["detections"]
-        )
         ## Configuration file, invalid
         self.f_config_nok_raw = ""
         with open(self.f_config_nok_path, encoding="utf-8") as file:
