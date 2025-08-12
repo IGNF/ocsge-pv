@@ -259,51 +259,54 @@ def delete_declarations(db_info: dict, declarations: set) -> None:
     logger.info("Deleting declarations and associated pairs")
     deleted_declarations_count = 0
     deleted_pairs_count = 0
-    with psycopg.connect(db_info["_pg_string"]) as conn:
-        try:
-            cur = conn.cursor()
-            with conn.transaction():
-                cur.execute(
-                    sql.SQL(
-                        "DELETE FROM {table} WHERE declaration_id IN ({id_list})"
-                    ).format(
-                        table=sql.Identifier(
-                            db_info["schema"],
-                            db_info["tables"]["links"],
+    if not declarations:
+        logger.info("No declaration to delete.")
+    else:
+        with psycopg.connect(db_info["_pg_string"]) as conn:
+            try:
+                cur = conn.cursor()
+                with conn.transaction():
+                    cur.execute(
+                        sql.SQL(
+                            "DELETE FROM {table} WHERE declaration_id IN ({id_list})"
+                        ).format(
+                            table=sql.Identifier(
+                                db_info["schema"],
+                                db_info["tables"]["links"],
+                            ),
+                            id_list=sql.SQL(", ").join(
+                                sql.Placeholder() * len(declarations)
+                            ),
                         ),
-                        id_list=sql.SQL(", ").join(
-                            sql.Placeholder() * len(declarations)
-                        ),
-                    ),
-                    tuple(declarations),
-                )
-                message = cur.statusmessage
-                count_match = re.match(r"DELETE +([0-9]+)", message)
-                count_str = count_match.group(1)
-                deleted_pairs_count = int(count_str)
+                        tuple(declarations),
+                    )
+                    message = cur.statusmessage
+                    count_match = re.match(r"DELETE +([0-9]+)", message)
+                    count_str = count_match.group(1)
+                    deleted_pairs_count = int(count_str)
 
-                cur.execute(
-                    sql.SQL(
-                        "DELETE FROM {table} WHERE id_dossier IN ({id_list})"
-                    ).format(
-                        table=sql.Identifier(
-                            db_info["schema"],
-                            db_info["tables"]["declarations"],
+                    cur.execute(
+                        sql.SQL(
+                            "DELETE FROM {table} WHERE id_dossier IN ({id_list})"
+                        ).format(
+                            table=sql.Identifier(
+                                db_info["schema"],
+                                db_info["tables"]["declarations"],
+                            ),
+                            id_list=sql.SQL(", ").join(
+                                sql.Placeholder() * len(declarations)
+                            ),
                         ),
-                        id_list=sql.SQL(", ").join(
-                            sql.Placeholder() * len(declarations)
-                        ),
-                    ),
-                    tuple(declarations),
-                )
-                message = cur.statusmessage
-                count_match = re.match(r"DELETE +([0-9]+)", message)
-                count_str = count_match.group(1)
-                deleted_declarations_count = int(count_str)
-        except Exception as exc:
-            logger.error(traceback.format_exc())
-            conn.rollback()
-            raise exc
+                        tuple(declarations),
+                    )
+                    message = cur.statusmessage
+                    count_match = re.match(r"DELETE +([0-9]+)", message)
+                    count_str = count_match.group(1)
+                    deleted_declarations_count = int(count_str)
+            except Exception as exc:
+                logger.error(traceback.format_exc())
+                conn.rollback()
+                raise exc
     logger.info(
         f"{deleted_declarations_count} declarations and {deleted_pairs_count} pairs deleted."
     )
@@ -322,45 +325,54 @@ def delete_detections(db_info: dict, detections: set) -> None:
     logger.info("Deleting detections and associated pairs")
     deleted_detections_count = 0
     deleted_pairs_count = 0
-    with psycopg.connect(db_info["_pg_string"]) as conn:
-        try:
-            cur = conn.cursor()
-            with conn.transaction():
-                cur.execute(
-                    sql.SQL(
-                        "DELETE FROM {table} WHERE detection_id IN ({id_list})"
-                    ).format(
-                        table=sql.Identifier(
-                            db_info["schema"],
-                            db_info["tables"]["links"],
+    if not detections:
+        logger.info("No detection to delete.")
+    else:
+        with psycopg.connect(db_info["_pg_string"]) as conn:
+            try:
+                cur = conn.cursor()
+                with conn.transaction():
+                    cur.execute(
+                        sql.SQL(
+                            "DELETE FROM {table} WHERE detection_id IN ({id_list})"
+                        ).format(
+                            table=sql.Identifier(
+                                db_info["schema"],
+                                db_info["tables"]["links"],
+                            ),
+                            id_list=sql.SQL(", ").join(
+                                sql.Placeholder() * len(detections)
+                            ),
                         ),
-                        id_list=sql.SQL(", ").join(sql.Placeholder() * len(detections)),
-                    ),
-                    tuple(detections),
-                )
-                message = cur.statusmessage
-                count_match = re.match(r"DELETE +([0-9]+)", message)
-                count_str = count_match.group(1)
-                deleted_pairs_count = int(count_str)
+                        tuple(detections),
+                    )
+                    message = cur.statusmessage
+                    count_match = re.match(r"DELETE +([0-9]+)", message)
+                    count_str = count_match.group(1)
+                    deleted_pairs_count = int(count_str)
 
-                cur.execute(
-                    sql.SQL("DELETE FROM {table} WHERE id_v2 IN ({id_list})").format(
-                        table=sql.Identifier(
-                            db_info["schema"],
-                            db_info["tables"]["detections"],
+                    cur.execute(
+                        sql.SQL(
+                            "DELETE FROM {table} WHERE id_v2 IN ({id_list})"
+                        ).format(
+                            table=sql.Identifier(
+                                db_info["schema"],
+                                db_info["tables"]["detections"],
+                            ),
+                            id_list=sql.SQL(", ").join(
+                                sql.Placeholder() * len(detections)
+                            ),
                         ),
-                        id_list=sql.SQL(", ").join(sql.Placeholder() * len(detections)),
-                    ),
-                    tuple(detections),
-                )
-                message = cur.statusmessage
-                count_match = re.match(r"DELETE +([0-9]+)", message)
-                count_str = count_match.group(1)
-                deleted_detections_count = int(count_str)
-        except Exception as exc:
-            logger.error(traceback.format_exc())
-            conn.rollback()
-            raise exc
+                        tuple(detections),
+                    )
+                    message = cur.statusmessage
+                    count_match = re.match(r"DELETE +([0-9]+)", message)
+                    count_str = count_match.group(1)
+                    deleted_detections_count = int(count_str)
+            except Exception as exc:
+                logger.error(traceback.format_exc())
+                conn.rollback()
+                raise exc
     logger.info(
         f"{deleted_detections_count} detections and {deleted_pairs_count} pairs deleted."
     )
@@ -378,33 +390,36 @@ def delete_pairs(db_info: dict, pairs: list) -> None:
     """
     logger.info("Deleting explicit pairs")
     deleted_pairs_count = 0
-    with psycopg.connect(db_info["_pg_string"]) as conn:
-        try:
-            cur = conn.cursor()
-            with conn.transaction():
-                for item in pairs:
-                    cur.execute(
-                        sql.SQL(
-                            "DELETE FROM {table} WHERE declaration_id=%s AND detection_id=%s"
-                        ).format(
-                            table=sql.Identifier(
-                                db_info["schema"],
-                                db_info["tables"]["links"],
-                            )
-                        ),
-                        (
-                            item["declaration"],
-                            item["detection"],
-                        ),
-                    )
-                    message = cur.statusmessage
-                    count_match = re.match(r"DELETE +([0-9]+)", message)
-                    count_str = count_match.group(1)
-                    deleted_pairs_count += int(count_str)
-        except Exception as exc:
-            logger.error(traceback.format_exc())
-            conn.rollback()
-            raise exc
+    if not pairs:
+        logger.info("No pair to delete.")
+    else:
+        with psycopg.connect(db_info["_pg_string"]) as conn:
+            try:
+                cur = conn.cursor()
+                with conn.transaction():
+                    for item in pairs:
+                        cur.execute(
+                            sql.SQL(
+                                "DELETE FROM {table} WHERE declaration_id=%s AND detection_id=%s"
+                            ).format(
+                                table=sql.Identifier(
+                                    db_info["schema"],
+                                    db_info["tables"]["links"],
+                                )
+                            ),
+                            (
+                                item["declaration"],
+                                item["detection"],
+                            ),
+                        )
+                        message = cur.statusmessage
+                        count_match = re.match(r"DELETE +([0-9]+)", message)
+                        count_str = count_match.group(1)
+                        deleted_pairs_count += int(count_str)
+            except Exception as exc:
+                logger.error(traceback.format_exc())
+                conn.rollback()
+                raise exc
     logger.info(f"{deleted_pairs_count} pairs deleted.")
 
 
