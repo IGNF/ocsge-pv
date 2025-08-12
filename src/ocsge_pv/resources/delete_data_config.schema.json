@@ -1,8 +1,8 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "pairing_configuration",
-    "title": "Pairing configuration",
-    "description": "The configuration for the pairing program",
+    "$id": "delete_configuration",
+    "title": "Data deletion configuration",
+    "description": "The configuration for the data deletion program",
     "type": "object",
     "properties": {
         "main_database": {
@@ -86,69 +86,57 @@
                 "tables"
             ]
         },
-        "cadastre_database": {
-            "description": "Connection details: access to a database table describing cadastral parcels",
+        "to_delete": {
+            "description": "Identifiers of objects to delete from the database",
             "type": "object",
             "properties": {
-                "host": {
-                    "description": "Database hostname",
-                    "type": "string",
-                    "anyOf": [
-                        {
-                            "format": "hostname"
+                "declarations": {
+                    "description": "Declarations list",
+                    "type": "array",
+                    "items": {
+                        "description": "declaration's FID",
+                        "type": "number"
+                    },
+                    "uniqueItems": true
+                },
+                "detections": {
+                    "description": "Detections list",
+                    "type": "array",
+                    "items": {
+                        "description": "detection's FID",
+                        "type": "number"
+                    },
+                    "uniqueItems": true
+                },
+                "pairs": {
+                    "description": "Detection-declaration pairs list",
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "declaration": {
+                                "description": "declaration's FID",
+                                "type": "number"
+                            },
+                            "detection": {
+                                "description": "detection's FID",
+                                "type": "number"
+                            }
                         },
-                        {
-                            "format": "ipv4"
-                        },
-                        {
-                            "format": "ipv6"
-                        }
-                    ]
-                },
-                "port": {
-                    "description": "Database host's port",
-                    "type": "integer"
-                },
-                "name": {
-                    "description": "Database's name on the host server",
-                    "type": "string",
-                    "pattern": "^[a-zA-_][a-zA-Z0-9_]+$|^\".*\"$"
-                },
-                "user": {
-                    "description": "User's name",
-                    "type": "string",
-                    "pattern": "^[a-zA-_][a-zA-Z0-9_]+$|^\".*\"$"
-                },
-                "password": {
-                    "description": "User's password",
-                    "type": "string"
-                },
-                "schema": {
-                    "description": "Name of the schema",
-                    "type": "string",
-                    "pattern": "^[a-zA-_][a-zA-Z0-9_]+$|^\".*\"$"
-                },
-                "table": {
-                    "description": "Name of the table",
-                    "type": "string",
-                    "pattern": "^[a-zA-_][a-zA-Z0-9_]+$|^\".*\"$"
+                        "additionalProperties": false,
+                        "required": [
+                            "declaration",
+                            "detection"
+                        ]
+                    },
+                    "uniqueItems": true
                 }
             },
-            "additionalProperties": false,
-            "required": [
-                "host",
-                "port",
-                "name",
-                "user",
-                "password",
-                "schema",
-                "table"
-            ]
+            "additionalProperties": false
         }
     },
     "additionalProperties": false,
     "required": [
-        "main_database",
-        "cadastre_database"
+        "main_database"
     ]
 }

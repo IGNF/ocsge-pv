@@ -139,6 +139,7 @@ def format_feature(in_data: dict) -> dict:
         "creation": None,
         "dern_modif": None,
         "archive": None,
+        "statut": None,
         "supprime": None,
     }
     if in_data is not None:
@@ -149,250 +150,282 @@ def format_feature(in_data: dict) -> dict:
         )
         out_data["creation"] = datetime.fromisoformat(in_data["dateDepot"])
         out_data["archive"] = in_data["archived"]
+        out_data["statut"] = in_data["state"]
         out_data["supprime"] = in_data["dateSuppressionParUsager"] is not None
         parcels_list = []
         contains_raw_geometry = False
-        for champ in in_data["champs"]:
-            field_name = ""
-            try:
-                if (
-                    re.search(
-                        r"^Cas particulier des projets en période transitoire +:",
-                        champ["label"],
-                    )
-                    is not None
-                ):  #
-                    field_name = "transit"
-                    out_data[field_name] = bool(champ["checked"])
-                elif (
-                    re.search(
-                        r"mon projet se situe dans la période des mesures transitoires et qu'il remplit l'ensemble des conditions",
-                        champ["label"],
-                    )
-                    is not None
-                ):
-                    field_name = "ex_date"
-                    out_data[field_name] = bool(champ["checked"])
-                elif (
-                    re.search(
-                        r"^Cas particulier des projets agrivoltaïques +:",
-                        champ["label"],
-                    )
-                    is not None
-                ):  #
-                    field_name = "agrivolt"
-                    out_data[field_name] = bool(champ["checked"])
-                elif (
-                    re.search(
-                        r"mon projet est une installation agrivoltaïque qui remplit l'ensemble de critères de la question précédente",
-                        champ["label"],
-                    )
-                    is not None
-                ):
-                    field_name = "ex_agriv"
-                    out_data[field_name] = bool(champ["checked"])
-                elif (
-                    re.search(r"^Etes-vous le porteur de projet", champ["label"])
-                    is not None
-                ):
-                    field_name = "porteur"
-                    out_data[field_name] = bool(champ["checked"])
-                elif re.search(r"SIRET du porteur", champ["label"]) is not None:
-                    field_name = "siret_port"
-                    out_data[field_name] = str(champ["stringValue"])
-                elif (
-                    re.search(
-                        r"référence de l'autorisation d'urbanisme", champ["label"]
-                    )
-                    is not None
-                ):
-                    field_name = "ref_urba"
-                    out_data[field_name] = str(champ["stringValue"])
-                elif re.search(r"type de projet principal", champ["label"]) is not None:
-                    field_name = "type_proj"
-                    out_data[field_name] = str(champ["stringValue"])
-                elif (
-                    re.search(
-                        r"installations de type trackers.*surface du socle béton",
-                        champ["label"],
-                    )
-                    is not None
-                ):
-                    field_name = "surf_socle"
-                    out_data[field_name] = float(champ["decimalNumber"])
-                elif re.search(r"avancement du projet", champ["label"]) is not None:
-                    field_name = "etat"
-                    out_data[field_name] = str(champ["stringValue"])
-                elif re.search(r"puissance crête maximum", champ["label"]) is not None:
-                    field_name = "puiss_max"
-                    out_data[field_name] = int(champ["integerNumber"])
-                elif (
-                    re.search(
-                        r"date du dépôt de la demande d'autorisation d'urbanisme",
-                        champ["label"],
-                    )
-                    is not None
-                ):
-                    field_name = "date_depot"
-                    out_data[field_name] = date.fromisoformat(champ["date"])
-                elif (
-                    re.search(
-                        r"date à laquelle l'autorisation d'urbanisme a été délivrée",
-                        champ["label"],
-                    )
-                    is not None
-                ):
-                    field_name = "date_deliv"
-                    out_data[field_name] = date.fromisoformat(champ["date"])
-                elif (
-                    re.search(r"date d'installation effective", champ["label"])
-                    is not None
-                ):
-                    field_name = "date_insta"
-                    out_data[field_name] = date.fromisoformat(champ["date"])
-                elif (
-                    re.search(r"durée initiale d'exploitation", champ["label"])
-                    is not None
-                ):
-                    field_name = "duree_exp"
-                    out_data[field_name] = int(champ["integerNumber"])
-                elif (
-                    re.search(r"adresse d’implantation du projet", champ["label"])
-                    is not None
-                ):
-                    field_name = "adresse"
-                    out_data[field_name] = str(champ["stringValue"])
-                elif (
-                    re.search(r"surface occupée par l'installation", champ["label"])
-                    is not None
-                ):
-                    field_name = "surf_occup"
-                    out_data[field_name] = float(champ["decimalNumber"])
-                elif (
-                    re.search(r"surface du terrain d’implantation", champ["label"])
-                    is not None
-                ):
-                    field_name = "surf_terr"
-                    out_data[field_name] = float(champ["decimalNumber"])
-                elif (
-                    re.search(r"Le projet est-il situé en \?", champ["label"])
-                    is not None
-                ):
-                    field_name = "localisat"
-                    out_data[field_name] = str(champ["stringValue"])
-                elif re.search(r"nature principale du sol", champ["label"]) is not None:
-                    field_name = "sol_nature"
-                    out_data[field_name] = str(champ["primaryValue"])
-                    if champ["secondaryValue"]:
-                        field_name = "sol_detail"
-                        out_data[field_name] = str(champ["secondaryValue"])
-                elif (
-                    re.search(
-                        r"type d’usage actuel du terrain d’implantation", champ["label"]
-                    )
-                    is not None
-                ):
-                    field_name = "usage_terr"
-                    out_data[field_name] = str(champ["stringValue"])
-                elif re.search(r"type d’activité agricole", champ["label"]) is not None:
-                    field_name = "type_agri"
-                    out_data[field_name] = str(champ["stringValue"])
-                elif (
-                    re.search(r"production agricole initiale", champ["label"])
-                    is not None
-                ):
-                    field_name = "agri_ini"
-                    out_data[field_name] = str(champ["stringValue"])
-                elif (
-                    re.search(r"production agricole résiduelle", champ["label"])
-                    is not None
-                ):
-                    field_name = "agri_resid"
-                    out_data[field_name] = str(champ["stringValue"])
-                elif (
-                    re.search(
-                        r"ancrage au sol.*avec des pieux en bois ou en métal",
-                        champ["label"],
-                    )
-                    is not None
-                ):
-                    field_name = "nat_pieux"
-                    out_data[field_name] = bool(champ["checked"])
-                elif re.search(r"type d'ancrage au sol", champ["label"]) is not None:
-                    field_name = "ancrage"
-                    out_data[field_name] = str(champ["stringValue"])
-                elif re.search(r"type de clôture", champ["label"]) is not None:
-                    field_name = "cloture"
-                    out_data[field_name] = str(champ["stringValue"])
-                elif re.search(r"type de revêtement", champ["label"]) is not None:
-                    field_name = "revetement"
-                    out_data[field_name] = str(champ["stringValue"])
-                elif re.search(r"hauteur des panneaux", champ["label"]) is not None:
-                    field_name = "haut_pann"
-                    out_data[field_name] = float(champ["decimalNumber"])
-                elif (
-                    re.search(r"espacement entre deux rangées", champ["label"])
-                    is not None
-                ):
-                    field_name = "espacement"
-                    out_data[field_name] = float(champ["decimalNumber"])
-                elif (
-                    re.search(
-                        r"^Les caractéristiques techniques de mon installation ne répondent pas aux critères",
-                        champ["label"],
-                    )
-                    is not None
-                ):
-                    field_name = "ex_techniq"
-                    out_data[field_name] = not bool(champ["checked"])
-                elif (
-                    re.search(
-                        r"^Les caractéristiques techniques de mon installation répondent aux critères",
-                        champ["label"],
-                    )
-                    is not None
-                ):
-                    field_name = "ex_techniq"
-                    out_data[field_name] = bool(champ["checked"])
-                elif (
-                    champ["__typename"] == "CarteChamp"
-                    and "parcelles" in champ["label"]
-                ):
-                    field_name = "num_parcelles"
-                    geometry = ogr.CreateGeometryFromWkt(
-                        "GEOMETRYCOLLECTION EMPTY", SOURCE_SRS
-                    )
-                    for geo_area in champ["geoAreas"]:
-                        if geo_area["source"] == "cadastre":
-                            parcel_uid = "{}{}{:0>2}{:0>4}".format(
-                                geo_area["commune"],
-                                geo_area["prefixe"],
-                                geo_area["section"],
-                                geo_area["numero"],
-                            )
-                            parcels_list.append(parcel_uid)
-                            parcel_geom = ogr.CreateGeometryFromJson(
-                                json.dumps(geo_area["geometry"], indent=None)
-                            )
-                            # This geometry's SRS in the source is EPSG:4326 but with swapped axis
-                            # Axes order: (longitude, latitude)
-                            parcel_geom.SwapXY()
-                            parcel_geom.AssignSpatialReference(SOURCE_SRS)
-                            geometry.AddGeometry(parcel_geom)
-                        else:
-                            contains_raw_geometry = True
-                    if len(parcels_list) == 0:
-                        raise ValueError(
-                            "Selected parcels list must contain at least one element."
+        if "champs" in in_data:
+            for champ in in_data["champs"]:
+                field_name = ""
+                try:
+                    if (
+                        re.search(
+                            r"^Cas particulier des projets en période transitoire +:",
+                            champ["label"],
                         )
-                    if contains_raw_geometry:
-                        raise ValueError(
-                            f"dossier '{dossier_number}' contains raw geometries"
+                        is not None
+                    ):  #
+                        field_name = "transit"
+                        out_data[field_name] = bool(champ["checked"])
+                    elif (
+                        re.search(
+                            r"mon projet se situe dans la période des mesures transitoires et qu'il remplit l'ensemble des conditions",
+                            champ["label"],
                         )
-            except (KeyError, TypeError, ValueError) as exc:
-                exc_type = str(type(exc)).replace("<class '", "").replace("'>", "")
-                logger.warning(f"on dossier '{dossier_number}', champ '{field_name}'")
-                logger.warning(f"---------- {exc_type}: {exc.args[0]}")
+                        is not None
+                    ):
+                        field_name = "ex_date"
+                        out_data[field_name] = bool(champ["checked"])
+                    elif (
+                        re.search(
+                            r"^Cas particulier des projets agrivoltaïques +:",
+                            champ["label"],
+                        )
+                        is not None
+                    ):  #
+                        field_name = "agrivolt"
+                        out_data[field_name] = bool(champ["checked"])
+                    elif (
+                        re.search(
+                            r"mon projet est une installation agrivoltaïque qui remplit l'ensemble de critères de la question précédente",
+                            champ["label"],
+                        )
+                        is not None
+                    ):
+                        field_name = "ex_agriv"
+                        out_data[field_name] = bool(champ["checked"])
+                    elif (
+                        re.search(r"^Etes-vous le porteur de projet", champ["label"])
+                        is not None
+                    ):
+                        field_name = "porteur"
+                        out_data[field_name] = bool(champ["checked"])
+                    elif re.search(r"SIRET du porteur", champ["label"]) is not None:
+                        field_name = "siret_port"
+                        out_data[field_name] = str(champ["stringValue"])
+                    elif (
+                        re.search(
+                            r"référence de l'autorisation d'urbanisme", champ["label"]
+                        )
+                        is not None
+                    ):
+                        field_name = "ref_urba"
+                        out_data[field_name] = str(champ["stringValue"])
+                    elif (
+                        re.search(r"type de projet principal", champ["label"])
+                        is not None
+                    ):
+                        field_name = "type_proj"
+                        out_data[field_name] = str(champ["stringValue"])
+                    elif (
+                        re.search(
+                            r"installations de type trackers.*surface du socle béton",
+                            champ["label"],
+                        )
+                        is not None
+                    ):
+                        field_name = "surf_socle"
+                        out_data[field_name] = float(champ["decimalNumber"])
+                    elif re.search(r"avancement du projet", champ["label"]) is not None:
+                        field_name = "etat"
+                        out_data[field_name] = str(champ["stringValue"])
+                    elif (
+                        re.search(r"puissance crête maximum", champ["label"])
+                        is not None
+                    ):
+                        field_name = "puiss_max"
+                        out_data[field_name] = int(champ["integerNumber"])
+                    elif (
+                        re.search(
+                            r"date du dépôt de la demande d'autorisation d'urbanisme",
+                            champ["label"],
+                        )
+                        is not None
+                    ):
+                        field_name = "date_depot"
+                        out_data[field_name] = date.fromisoformat(champ["date"])
+                    elif (
+                        re.search(
+                            r"date à laquelle l'autorisation d'urbanisme a été délivrée",
+                            champ["label"],
+                        )
+                        is not None
+                    ):
+                        field_name = "date_deliv"
+                        out_data[field_name] = date.fromisoformat(champ["date"])
+                    elif (
+                        re.search(r"date d'installation effective", champ["label"])
+                        is not None
+                    ):
+                        field_name = "date_insta"
+                        out_data[field_name] = date.fromisoformat(champ["date"])
+                    elif (
+                        re.search(r"durée initiale d'exploitation", champ["label"])
+                        is not None
+                    ):
+                        field_name = "duree_exp"
+                        out_data[field_name] = int(champ["integerNumber"])
+                    elif (
+                        re.search(r"adresse d’implantation du projet", champ["label"])
+                        is not None
+                    ):
+                        field_name = "adresse"
+                        out_data[field_name] = str(champ["stringValue"])
+                    elif (
+                        re.search(r"surface occupée par l'installation", champ["label"])
+                        is not None
+                    ):
+                        field_name = "surf_occup"
+                        out_data[field_name] = float(champ["decimalNumber"])
+                    elif (
+                        re.search(r"surface du terrain d’implantation", champ["label"])
+                        is not None
+                    ):
+                        field_name = "surf_terr"
+                        out_data[field_name] = float(champ["decimalNumber"])
+                    elif (
+                        re.search(r"Le projet est-il situé en \?", champ["label"])
+                        is not None
+                    ):
+                        field_name = "localisat"
+                        out_data[field_name] = str(champ["stringValue"])
+                    elif (
+                        re.search(r"nature principale du sol", champ["label"])
+                        is not None
+                    ):
+                        field_name = "sol_nature"
+                        out_data[field_name] = str(champ["primaryValue"])
+                        if champ["secondaryValue"]:
+                            field_name = "sol_detail"
+                            out_data[field_name] = str(champ["secondaryValue"])
+                    elif (
+                        re.search(
+                            r"type d’usage actuel du terrain d’implantation",
+                            champ["label"],
+                        )
+                        is not None
+                    ):
+                        field_name = "usage_terr"
+                        out_data[field_name] = str(champ["stringValue"])
+                    elif (
+                        re.search(r"type d’activité agricole", champ["label"])
+                        is not None
+                    ):
+                        field_name = "type_agri"
+                        out_data[field_name] = str(champ["stringValue"])
+                    elif (
+                        re.search(r"production agricole initiale", champ["label"])
+                        is not None
+                    ):
+                        field_name = "agri_ini"
+                        out_data[field_name] = str(champ["stringValue"])
+                    elif (
+                        re.search(r"production agricole résiduelle", champ["label"])
+                        is not None
+                    ):
+                        field_name = "agri_resid"
+                        out_data[field_name] = str(champ["stringValue"])
+                    elif (
+                        re.search(
+                            r"ancrage au sol.*avec des pieux en bois ou en métal",
+                            champ["label"],
+                        )
+                        is not None
+                    ):
+                        field_name = "nat_pieux"
+                        out_data[field_name] = bool(champ["checked"])
+                    elif (
+                        re.search(r"type d'ancrage au sol", champ["label"]) is not None
+                    ):
+                        field_name = "ancrage"
+                        out_data[field_name] = str(champ["stringValue"])
+                    elif re.search(r"type de clôture", champ["label"]) is not None:
+                        field_name = "cloture"
+                        out_data[field_name] = str(champ["stringValue"])
+                    elif re.search(r"type de revêtement", champ["label"]) is not None:
+                        field_name = "revetement"
+                        out_data[field_name] = str(champ["stringValue"])
+                    elif re.search(r"hauteur des panneaux", champ["label"]) is not None:
+                        field_name = "haut_pann"
+                        out_data[field_name] = float(champ["decimalNumber"])
+                    elif (
+                        re.search(r"espacement entre deux rangées", champ["label"])
+                        is not None
+                    ):
+                        field_name = "espacement"
+                        out_data[field_name] = float(champ["decimalNumber"])
+                    elif (
+                        re.search(
+                            r"^Les caractéristiques techniques de mon installation ne répondent pas aux critères",
+                            champ["label"],
+                        )
+                        is not None
+                    ):
+                        field_name = "ex_techniq"
+                        out_data[field_name] = not bool(champ["checked"])
+                    elif (
+                        re.search(
+                            r"^Les caractéristiques techniques de mon installation répondent aux critères",
+                            champ["label"],
+                        )
+                        is not None
+                    ):
+                        field_name = "ex_techniq"
+                        out_data[field_name] = bool(champ["checked"])
+                    elif (
+                        champ["__typename"] == "CarteChamp"
+                        and "parcelles" in champ["label"]
+                    ):
+                        field_name = "num_parcelles"
+                        geometry = ogr.CreateGeometryFromWkt(
+                            "MULTIPOLYGON EMPTY", SOURCE_SRS
+                        )
+                        for geo_area in champ["geoAreas"]:
+                            if geo_area["source"] == "cadastre":
+                                parcel_uid = "{}{}{:0>2}{:0>4}".format(
+                                    geo_area["commune"],
+                                    geo_area["prefixe"],
+                                    geo_area["section"],
+                                    geo_area["numero"],
+                                )
+                                parcels_list.append(parcel_uid)
+                                parcel_geom = ogr.CreateGeometryFromJson(
+                                    json.dumps(geo_area["geometry"], indent=None)
+                                )
+                                # This geometry's SRS in the source is EPSG:4326 but with swapped axis
+                                # Axes order: (longitude, latitude)
+                                parcel_geom.SwapXY()
+                                parcel_geom.AssignSpatialReference(SOURCE_SRS)
+                                parcel_geom = parcel_geom.MakeValid()
+                                tmp_geometry = geometry.Clone()
+                                geometry = tmp_geometry.Union(parcel_geom)
+                                logger.debug(
+                                    "geometry type for parcel "
+                                    + f"'{parcel_uid}': {parcel_geom.GetGeometryName()}"
+                                )
+                            else:
+                                contains_raw_geometry = True
+                        tmp_geometry = geometry.Clone()
+                        geometry = ogr.ForceToMultiPolygon(tmp_geometry.MakeValid())
+                        logger.debug(
+                            "geometry type for dossier "
+                            + f"'{dossier_number}': {geometry.GetGeometryName()}"
+                        )
+                        if len(parcels_list) == 0:
+                            logger.warning(
+                                f"dossier '{dossier_number}' contains no selected parcel."
+                            )
+                        if contains_raw_geometry:
+                            logger.warning(
+                                f"dossier '{dossier_number}' contains raw geometries"
+                            )
+                except (KeyError, TypeError, ValueError) as exc:
+                    exc_type = str(type(exc)).replace("<class '", "").replace("'>", "")
+                    message = (
+                        f"on dossier '{dossier_number}', champ '{field_name}'"
+                        + f" -- {exc_type}: {exc.args[0]}"
+                    )
+                    logger.warning(message)
         try:
             if out_data["porteur"]:
                 out_data["siret_port"] = str(in_data["demandeur"]["siret"])
@@ -569,12 +602,22 @@ def query_source_api(input_conf: dict) -> dict:
     query_gql = gql(query_string)
     query_params = {
         "demarcheNumber": input_conf["demarche_id"],
+        "includeAnotations": False,
+        "includeAvis": False,
         "includeChamps": True,
-        "includeDossiers": True,
+        "includeCorrections": True,
         "includeDeletedDossiers": True,
+        "includeDossiers": True,
         "includeGeometry": True,
+        "includeGroupeInstructeurs": False,
+        "includeInstructeurs": False,
+        "includeLabels": False,
+        "includeMessages": False,
+        "includePendingDeletedDossiers": False,
+        "includeRevision": False,
+        "includeService": False,
+        "includeTraitements": False,
         "order": "ASC",
-        "state": "accepte",
     }
     date_filter = input_conf.get("min_update_datetime")
     if date_filter is not None:

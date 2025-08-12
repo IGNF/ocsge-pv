@@ -1,4 +1,33 @@
-query getDemarche($demarcheNumber: Int!, $state: DossierState, $first: Int, $last: Int, $before: String, $after: String, $archived: Boolean, $revision: ID, $createdSince: ISO8601DateTime, $updatedSince: ISO8601DateTime, $pendingDeletedFirst: Int, $pendingDeletedLast: Int, $pendingDeletedBefore: String, $pendingDeletedAfter: String, $pendingDeletedSince: ISO8601DateTime, $deletedFirst: Int, $deletedLast: Int, $deletedBefore: String, $deletedAfter: String, $deletedSince: ISO8601DateTime, $includeGroupeInstructeurs: Boolean = false, $includeDossiers: Boolean = false, $includePendingDeletedDossiers: Boolean = false, $includeDeletedDossiers: Boolean = false, $includeRevision: Boolean = false, $includeService: Boolean = false, $includeChamps: Boolean = true, $includeAnotations: Boolean = true, $includeTraitements: Boolean = true, $includeInstructeurs: Boolean = true, $includeAvis: Boolean = false, $includeMessages: Boolean = false, $includeCorrections: Boolean = false, $includeGeometry: Boolean = false) {
+query getDemarche(
+  $demarcheNumber: Int!
+  $state: DossierState
+  $first: Int
+  $after: String
+  $archived: Boolean
+  $revision: ID
+  $createdSince: ISO8601DateTime
+  $updatedSince: ISO8601DateTime
+  $deletedFirst: Int
+  $deletedAfter: String
+  $deletedSince: ISO8601DateTime
+  $pendingDeletedFirst: Int
+  $pendingDeletedAfter: String
+  $pendingDeletedSince: ISO8601DateTime
+  $includeGroupeInstructeurs: Boolean = false
+  $includeDossiers: Boolean = false
+  $includeDeletedDossiers: Boolean = false
+  $includePendingDeletedDossiers: Boolean = false
+  $includeRevision: Boolean = false
+  $includeService: Boolean = false
+  $includeChamps: Boolean = true
+  $includeAnotations: Boolean = true
+  $includeTraitements: Boolean = true
+  $includeInstructeurs: Boolean = true
+  $includeAvis: Boolean = false
+  $includeMessages: Boolean = false
+  $includeLabels: Boolean = false
+  $includeGeometry: Boolean = false
+) {
   demarche(number: $demarcheNumber) {
     id
     number
@@ -7,11 +36,6 @@ query getDemarche($demarcheNumber: Int!, $state: DossierState, $first: Int, $las
     declarative
     dateCreation
     dateFermeture
-    chorusConfiguration {
-      centreDeCout
-      domaineFonctionnel
-      referentielDeProgrammation
-    }
     activeRevision @include(if: $includeRevision) {
       ...RevisionFragment
     }
@@ -21,11 +45,12 @@ query getDemarche($demarcheNumber: Int!, $state: DossierState, $first: Int, $las
     service @include(if: $includeService) {
       ...ServiceFragment
     }
+    labels @include(if: $includeLabels){
+      ...LabelFragment
+    }
     dossiers(
       state: $state
       first: $first
-      last: $last
-      before: $before
       after: $after
       archived: $archived
       createdSince: $createdSince
@@ -41,8 +66,6 @@ query getDemarche($demarcheNumber: Int!, $state: DossierState, $first: Int, $las
     }
     pendingDeletedDossiers(
       first: $pendingDeletedFirst
-      last: $pendingDeletedLast
-      before: $pendingDeletedBefore
       after: $pendingDeletedAfter
       deletedSince: $pendingDeletedSince
     ) @include(if: $includePendingDeletedDossiers) {
@@ -55,8 +78,6 @@ query getDemarche($demarcheNumber: Int!, $state: DossierState, $first: Int, $las
     }
     deletedDossiers(
       first: $deletedFirst
-      last: $deletedLast
-      before: $deletedBefore
       after: $deletedAfter
       deletedSince: $deletedSince
     ) @include(if: $includeDeletedDossiers) {
@@ -88,11 +109,9 @@ fragment GroupeInstructeurFragment on GroupeInstructeur {
 }
 
 fragment DossierFragment on Dossier {
-  __typename
   id
   number
   archived
-  prefilled
   state
   dateDerniereModification
   dateDepot
@@ -101,7 +120,6 @@ fragment DossierFragment on Dossier {
   dateTraitement
   dateExpiration
   dateSuppressionParUsager
-  dateDerniereCorrectionEnAttente @include(if: $includeCorrections)
   motivation
   motivationAttachment {
     ...FileFragment
@@ -110,20 +128,23 @@ fragment DossierFragment on Dossier {
     ...FileFragment
   }
   pdf {
-    ...FileFragment
+    url
   }
   usager {
     email
   }
-  connectionUsager
   groupeInstructeur {
     ...GroupeInstructeurFragment
   }
   demandeur {
     __typename
-    ...PersonnePhysiqueFragment
+    ... on PersonnePhysique {
+      civilite
+      nom
+      prenom
+    }
+    ... on PersonneMoraleIncomplete { siret }
     ...PersonneMoraleFragment
-    ...PersonneMoraleIncompleteFragment
   }
   demarche {
     revision {
@@ -153,6 +174,9 @@ fragment DossierFragment on Dossier {
   }
   messages @include(if: $includeMessages) {
     ...MessageFragment
+  }
+  labels @include(if: $includeLabels) {
+    ...LabelFragment
   }
 }
 
@@ -237,10 +261,12 @@ fragment MessageFragment on Message {
   attachments {
     ...FileFragment
   }
-  correction @include(if: $includeCorrections) {
-    reason
-    dateResolution
-  }
+}
+
+fragment LabelFragment on Label {
+  id
+  name
+  color
 }
 
 fragment GeoAreaFragment on GeoArea {
@@ -287,8 +313,6 @@ fragment ChampFragment on Champ {
   __typename
   label
   stringValue
-  updatedAt
-  prefilled
   ... on DateChamp {
     date
   }
@@ -323,52 +347,38 @@ fragment ChampFragment on Champ {
     address {
       ...AddressFragment
     }
-    commune {
-      ...CommuneFragment
-    }
-    departement {
-      ...DepartementFragment
-    }
-  }
-  ... on EpciChamp {
-    epci {
-      ...EpciFragment
-    }
-    departement {
-      ...DepartementFragment
-    }
   }
   ... on CommuneChamp {
     commune {
-      ...CommuneFragment
+      name
+      code
     }
     departement {
-      ...DepartementFragment
+      name
+      code
     }
   }
   ... on DepartementChamp {
     departement {
-      ...DepartementFragment
+      name
+      code
     }
   }
   ... on RegionChamp {
     region {
-      ...RegionFragment
+      name
+      code
     }
   }
   ... on PaysChamp {
     pays {
-      ...PaysFragment
+      name
+      code
     }
   }
   ... on SiretChamp {
     etablissement {
       ...PersonneMoraleFragment
-    }
-  }
-  ... on RNFChamp {
-    rnf {
-      ...RNFFragment
     }
   }
 }
@@ -411,24 +421,12 @@ fragment PersonneMoraleFragment on PersonneMorale {
   }
 }
 
-fragment PersonneMoraleIncompleteFragment on PersonneMoraleIncomplete {
-  siret
-}
-
-fragment PersonnePhysiqueFragment on PersonnePhysique {
-  civilite
-  nom
-  prenom
-}
-
 fragment FileFragment on File {
-  __typename
   filename
   contentType
   checksum
   byteSize: byteSizeBigInt
   url
-  createdAt
 }
 
 fragment AddressFragment on Address {
@@ -446,43 +444,8 @@ fragment AddressFragment on Address {
   regionCode
 }
 
-fragment PaysFragment on Pays {
-  name
-  code
-}
-
-fragment RegionFragment on Region {
-  name
-  code
-}
-
-fragment DepartementFragment on Departement {
-  name
-  code
-}
-
-fragment EpciFragment on Epci {
-  name
-  code
-}
-
-fragment CommuneFragment on Commune {
-  name
-  code
-  postalCode
-}
-
-fragment RNFFragment on RNF {
-  id
-  title
-  address {
-    ...AddressFragment
-  }
-}
-
 fragment PageInfoFragment on PageInfo {
   hasPreviousPage
   hasNextPage
-  startCursor
   endCursor
 }

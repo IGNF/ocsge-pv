@@ -1,4 +1,4 @@
-"""Describes unit tests for the ocsge_pv.clean_data module.
+"""Describes unit tests for the ocsge_pv.delete_data module.
 
 There is one test class for each tested functionnality.
 See internal docstrings for more information.
@@ -15,7 +15,7 @@ from unittest.mock import call, mock_open, patch
 
 from jsonschema import ValidationError, validate
 
-from ocsge_pv.clean_data import load_configuration
+from ocsge_pv.delete_data import load_configuration
 
 try:
     OCSGE_PV_FIXTURE_DIR = Path(os.environ.get("OCSGE_PV_FIXTURE_DIR").strip()).resolve()
@@ -32,15 +32,25 @@ class TestConfigurationValidationSchema(TestCase):
     """Tests the configuration validation schema itself."""
 
     def setUp(self):
-        self.schema_path = f"{OCSGE_PV_RESOURCE_DIR}/clean_data_config.schema.json"
-        self.f_config_ok_path = f"{OCSGE_PV_FIXTURE_DIR}/clean_data_config.ok.json"
-        self.f_config_nok_path = f"{OCSGE_PV_FIXTURE_DIR}/clean_data_config.nok.json"
+        self.schema_path = f"{OCSGE_PV_RESOURCE_DIR}/delete_data_config.schema.json"
+        self.f_config_ok_minimal_path = f"{OCSGE_PV_FIXTURE_DIR}/delete_data_config.ok_minimal.json"
+        self.f_config_ok_full_path = f"{OCSGE_PV_FIXTURE_DIR}/delete_data_config.ok_full.json"
+        self.f_config_nok_path = f"{OCSGE_PV_FIXTURE_DIR}/delete_data_config.nok.json"
         with open(self.schema_path, encoding="utf-8") as fp:
             self.schema = json.load(fp)
 
-    def test_with_valid_config(self):
+    def test_with_valid_minimal_config(self):
         # Preparation
-        with open(self.f_config_ok_path, encoding="utf-8") as fp:
+        with open(self.f_config_ok_minimal_path, encoding="utf-8") as fp:
+            f_config_obj = json.load(fp)
+        # Call to the tested function
+        result = validate(f_config_obj, self.schema)
+        # Assertions
+        self.assertIsNone(result)
+
+    def test_with_valid_full_config(self):
+        # Preparation
+        with open(self.f_config_ok_full_path, encoding="utf-8") as fp:
             f_config_obj = json.load(fp)
         # Call to the tested function
         result = validate(f_config_obj, self.schema)
@@ -64,8 +74,8 @@ class TestConfigurationLoader(TestCase):
         self.env_copy["OCSGE_PV_RESOURCE_DIR"] = str(OCSGE_PV_RESOURCE_DIR)
         # Fixtures
         ## Configuration file path
-        self.f_config_ok_path = Path(OCSGE_PV_FIXTURE_DIR, "clean_data_config.ok.json")
-        self.f_config_nok_path = Path(OCSGE_PV_FIXTURE_DIR, "clean_data_config.nok.json")
+        self.f_config_ok_path = Path(OCSGE_PV_FIXTURE_DIR, "delete_data_config.ok_full.json")
+        self.f_config_nok_path = Path(OCSGE_PV_FIXTURE_DIR, "delete_data_config.nok.json")
         ## Configuration file, nominal
         self.f_config_ok_raw = ""
         with open(self.f_config_ok_path, encoding="utf-8") as file:
@@ -73,7 +83,7 @@ class TestConfigurationLoader(TestCase):
         ## Configuration object, nominal before validation
         self.f_config_ok_obj = json.loads(self.f_config_ok_raw)
         ## Configuration object, nominal after complete load
-        f_config_loaded_path = Path(OCSGE_PV_FIXTURE_DIR, "clean_data_config.loaded.json")
+        f_config_loaded_path = Path(OCSGE_PV_FIXTURE_DIR, "delete_data_config.loaded.json")
         with open(f_config_loaded_path, encoding="utf-8") as file:
             f_config_loaded_raw = file.read()
         self.f_config_loaded_obj = json.loads(f_config_loaded_raw)
@@ -84,13 +94,13 @@ class TestConfigurationLoader(TestCase):
         ## Configuration object, invalid
         self.f_config_nok_obj = json.loads(self.f_config_nok_raw)
 
-        ## Configuration file path
-        self.f_config_schema_path = Path(OCSGE_PV_RESOURCE_DIR, "clean_data_config.schema.json")
-        ## Configuration file, nominal
+        ## Configuration schema path
+        self.f_config_schema_path = Path(OCSGE_PV_RESOURCE_DIR, "delete_data_config.schema.json")
+        ## Schema file, nominal
         self.f_config_schema_raw = ""
         with open(self.f_config_schema_path, encoding="utf-8") as file:
             self.f_config_schema_raw = file.read()
-        ## Configuration object, nominal
+        ## Schema object, nominal
         self.f_config_schema_obj = json.loads(self.f_config_schema_raw)
 
     @patch("jsonschema.validate")
@@ -113,7 +123,7 @@ class TestConfigurationLoader(TestCase):
             ]
         )
         m_validator.assert_called_with(self.f_config_ok_obj, self.f_config_schema_obj)
-        self.assertDictEqual(result, self.f_config_loaded_obj)
+        self.assertEqual(result, self.f_config_loaded_obj)
 
     @patch("jsonschema.validate", side_effect=ValidationError("Invalid configuration."))
     @patch("builtins.open")

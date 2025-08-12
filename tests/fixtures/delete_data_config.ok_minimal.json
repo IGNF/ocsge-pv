@@ -11,14 +11,5 @@
             "declarations": "declaration",
             "links": "declaration_detection"
         }
-    },
-    "cadastre_database": {
-        "host": "localhost",
-        "port": 5433,
-        "name": "cadastre",
-        "user": "land_surveyor",
-        "password": "1arpent",
-        "schema": "cadastre_data",
-        "table": "parcels"
     }
 }

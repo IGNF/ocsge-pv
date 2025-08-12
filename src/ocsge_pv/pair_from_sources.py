@@ -27,7 +27,6 @@ import argparse
 import json
 import logging
 import os
-import re
 import sys
 import traceback
 from copy import deepcopy
@@ -38,6 +37,8 @@ import jsonschema
 import psycopg
 from osgeo import ogr, osr
 from psycopg import sql
+
+from ocsge_pv import delete_data
 
 # -- GLOBALS --
 
@@ -97,55 +98,10 @@ def delete_before_matching(output_conf: dict, id_set: set[dict]) -> None:
         output_conf (dict): output database information
         id_set (set[int]): set of targeted declarations' identifiers
     """
-    deleted_dec_count = 0
-    deleted_pair_count = 0
-    with psycopg.connect(output_conf["_pg_string"]) as conn:
-        cur = conn.cursor()
-        try:
-            with conn.transaction():
-                for fid in id_set:
-                    logger.log(
-                        TRACE, f"Deleting pairs associated with declaration {fid}."
-                    )
-                    cur.execute(
-                        sql.SQL(
-                            "DELETE FROM {table} WHERE {dec_key} = {dec_value}"
-                        ).format(
-                            table=sql.Identifier(
-                                output_conf["schema"],
-                                output_conf["tables"]["links"],
-                            ),
-                            dec_key=sql.Identifier("declaration_id"),
-                            dec_value=sql.Placeholder("dec_value"),
-                        ),
-                        {"dec_value": fid},
-                    )
-                    pair_message = cur.statusmessage
-                    pair_count_match = re.match(r"DELETE +([0-9]+)", pair_message)
-                    pair_count_str = pair_count_match.group(1)
-                    pair_count_int = int(pair_count_str)
-                    deleted_pair_count += pair_count_int
-                    logger.log(TRACE, f"Deleting declaration {fid}.")
-                    cur.execute(
-                        sql.SQL(
-                            "DELETE FROM {table} WHERE {dec_key} = {dec_value}"
-                        ).format(
-                            table=sql.Identifier(
-                                output_conf["schema"],
-                                output_conf["tables"]["declarations"],
-                            ),
-                            dec_key=sql.Identifier("id_dossier"),
-                            dec_value=sql.Placeholder("dec_value"),
-                        ),
-                        {"dec_value": fid},
-                    )
-                    deleted_dec_count += 1
-        except Exception as exc:
-            logger.error(traceback.format_exc())
-            conn.rollback()
-            raise exc
-    logger.debug(f"{deleted_dec_count} declarations deleted from database.")
-    logger.debug(f"{deleted_pair_count} linked pairs deleted from database.")
+    try:
+        delete_data.delete_declarations(output_conf, id_set)
+    except Exception as exc:
+        raise exc
 
 
 def delete_after_matching(output_conf: dict, link_set: set[tuple]) -> None:
@@ -157,35 +113,17 @@ def delete_after_matching(output_conf: dict, link_set: set[tuple]) -> None:
             (declaration_id: int, detection_id: int)
     """
     deleted_pairs_count = 0
-    with psycopg.connect(output_conf["_pg_string"]) as conn:
-        cur = conn.cursor()
-        try:
-            with conn.transaction():
-                for link_tuple in link_set:
-                    logger.log(TRACE, f"Deleting pair {link_tuple}.")
-                    cur.execute(
-                        sql.SQL(
-                            "DELETE FROM {table} WHERE {dec_key} = %s AND {det_key} = %s"
-                        ).format(
-                            table=sql.Identifier(
-                                output_conf["schema"],
-                                output_conf["tables"]["links"],
-                            ),
-                            dec_key=sql.Identifier("declaration_id"),
-                            det_key=sql.Identifier("detection_id"),
-                        ),
-                        link_tuple,
-                    )
-                    message = cur.statusmessage
-                    count_match = re.match(r"DELETE +([0-9]+)", message)
-                    count_str = count_match.group(1)
-                    count_int = int(count_str)
-                    deleted_pairs_count += count_int
-        except Exception as exc:
-            logger.error(traceback.format_exc())
-            conn.rollback()
-            raise exc
-    logger.debug(f"{deleted_pairs_count} pairs deleted from database.")
+    pairs_list = []
+    for link_tuple in link_set:
+        pair = {
+            "declaration": link_tuple[0],
+            "detection": link_tuple[1],
+        }
+        pairs_list.append(pair)
+    try:
+        delete_data.delete_pairs(output_conf, pairs_list)
+    except Exception as exc:
+        raise exc
 
 
 def insert_new(output_conf: dict, link_set: set[tuple]) -> None:
@@ -285,21 +223,28 @@ def check_declared_parcels(data_layer: ogr.Layer) -> set[int]:
     Returns:
         set: id sequence for declarations to delete
     """
+    # Create the set of id to delete
+    deletion_set = set()
     # Create a parcels dict with a more useful structure
     parcels_dict = {}
     for feature in data_layer:
         feature_id = feature.GetFID()
-        parcels_list = feature.GetField("num_parcelles").split(";")
-        feature_year = feature.GetFieldAsDateTime("date_insta")[0]
-        feature_creation_date = feature.GetField("creation").replace("/", "-")
-        for parcel_idu in parcels_list:
-            if parcel_idu not in parcels_dict:
-                parcels_dict[parcel_idu] = {}
-            if feature_year not in parcels_dict[parcel_idu]:
-                parcels_dict[parcel_idu][feature_year] = {}
-            parcels_dict[parcel_idu][feature_year][feature_creation_date] = feature_id
-    # Create and fill the set of id to delete
-    deletion_set = set()
+        parcels_string = feature.GetField("num_parcelles")
+        if parcels_string is None or parcels_string == "":
+            deletion_set.add(feature_id)
+        else:
+            parcels_list = parcels_string.split(";")
+            feature_year = feature.GetFieldAsDateTime("date_insta")[0]
+            feature_creation_date = feature.GetField("creation").replace("/", "-")
+            for parcel_idu in parcels_list:
+                if parcel_idu not in parcels_dict:
+                    parcels_dict[parcel_idu] = {}
+                if feature_year not in parcels_dict[parcel_idu]:
+                    parcels_dict[parcel_idu][feature_year] = {}
+                parcels_dict[parcel_idu][feature_year][
+                    feature_creation_date
+                ] = feature_id
+    # Fill the set of id to delete
     for idu in list(parcels_dict):
         for year in list(parcels_dict[idu]):
             # Check declarations for a specific parcel and installation year
