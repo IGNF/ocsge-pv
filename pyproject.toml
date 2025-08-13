@@ -78,8 +78,8 @@ src = ["src"]
 target-version = "py310"
 
 # Allow autofix for all enabled rules (when `--fix`) is provided.
-fixable = ["ALL"]
-unfixable = []
+lint.fixable = ["ALL"]
+lint.unfixable = []
 
 [tool.setuptools.packages.find]
 where = ["src"]
