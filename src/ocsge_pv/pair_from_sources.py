@@ -212,7 +212,7 @@ def load_configuration(path: Path) -> dict:
 def check_declared_parcels(data_layer: ogr.Layer) -> set[int]:
     """Check for duplicate parcels in declarations
 
-    When multiple declarations, for the same installation date,
+    When multiple declarations, for the same installation year,
     have at least one common selected parcel, only the most recent
     declaration is deemed correct. The rest is discarded, and thus
     marked for deletion.
@@ -225,6 +225,7 @@ def check_declared_parcels(data_layer: ogr.Layer) -> set[int]:
     """
     # Create the set of id to delete
     deletion_set = set()
+    deletion_cause_dict = {}
     # Create a parcels dict with a more useful structure
     parcels_dict = {}
     for feature in data_layer:
@@ -232,6 +233,10 @@ def check_declared_parcels(data_layer: ogr.Layer) -> set[int]:
         parcels_string = feature.GetField("num_parcelles")
         if parcels_string is None or parcels_string == "":
             deletion_set.add(feature_id)
+            if feature_id not in deletion_cause_dict:
+                deletion_cause_dict[feature_id] = set()
+            cause = "No associated cadastral parcel"
+            deletion_cause_dict[feature_id].add(cause)
         else:
             parcels_list = parcels_string.split(";")
             feature_year = feature.GetFieldAsDateTime("date_insta")[0]
@@ -260,6 +265,18 @@ def check_declared_parcels(data_layer: ogr.Layer) -> set[int]:
                 detection_id = parcels_dict[idu][year][creation_iso]
                 if creation_object < last_creation:
                     deletion_set.add(detection_id)
+                    if detection_id not in deletion_cause_dict:
+                        deletion_cause_dict[detection_id] = set()
+                    cause = (
+                        "Geometry overlaps with a more recent dossier "
+                        + f"with the same effective installation year {year})"
+                    )
+                    deletion_cause_dict[detection_id].add(cause)
+    del_list = list(deletion_set)
+    logger.warning(f"Declarations deletion list = {del_list} (Count: {len(del_list)})")
+    for fid in del_list:
+        message = f"Declaration dossier {fid} will be deleted. (Cause·s: {str(deletion_cause_dict[fid])})"
+        logger.warning(message)
     return deletion_set
 
 
@@ -294,71 +311,95 @@ def match_dec_to_det(
             }
     """
     result = {"new": set(), "del": set()}
+    del_cause_dict = {}
+    ignored_old_links_count = 0
+    ignored_new_links_count = 0
     for det_feature in det_layer:
         linked_dec_dict = {}
         old_linked_dec_set = set()
         det_fid = det_feature.GetFID()
         det_geom = det_feature.GetGeometryRef().Clone()
+        if det_geom is None or det_geom.IsEmpty():
+            raise ValueError(f"Detection '{det_fid}' has a empty or null geometry.")
+        # Check for existing links with this detection
         link_layer.SetAttributeFilter(f"detection_id = {det_fid}")
         for link_feature in link_layer:
             dec_fid = link_feature.GetField("declaration_id")
             dec_feature = dec_layer.GetFeature(dec_fid)
             if dec_feature is None:
-                logger.warning(
-                    f"Link between detection {det_fid} and missing declaration {dec_fid} will be deleted."
-                )
                 link_tuple = (dec_fid, det_fid)
                 result["del"].add(link_tuple)
+                if str(link_tuple) not in del_cause_dict:
+                    del_cause_dict[str(link_tuple)] = set()
+                cause = f"Dossier {dec_fid} not found"
+                del_cause_dict[str(link_tuple)].add(cause)
             else:
                 creation_iso = dec_feature.GetField("creation").replace("/", "-")
-                installation_iso = dec_feature.GetField("date_insta").replace("/", "-")
                 linked_dec_dict[dec_fid] = {
                     "creation": datetime.fromisoformat(creation_iso),
-                    "installation": datetime.fromisoformat(installation_iso),
                 }
             old_linked_dec_set.add(dec_fid)
+        # Pair this detection with intersecting declarations
         for dec_feature in dec_layer:
-            dec_year = dec_feature.GetFieldAsDateTime("date_insta")[0]
             dec_geom = dec_feature.GetGeometryRef().Clone()
-            if dec_geom is not None and det_feature.GetField("millesime") >= dec_year:
+            if dec_geom is not None and not dec_geom.IsEmpty():
                 if need_swap:
                     dec_geom.SwapXY()
                 if transform is not None:
                     dec_geom.Transform(transform)
                 if det_geom.Intersects(dec_geom):
                     creation_iso = dec_feature.GetField("creation").replace("/", "-")
-                    installation_iso = dec_feature.GetField("date_insta").replace(
-                        "/", "-"
-                    )
                     linked_dec_dict[dec_feature.GetFID()] = {
                         "creation": datetime.fromisoformat(creation_iso),
-                        "installation": datetime.fromisoformat(installation_iso),
                     }
+        # Check for duplicates, and find which one will be kept
         latest_fid = None
         for dec_fid in list(linked_dec_dict):
             dec_feature = dec_layer.GetFeature(dec_fid)
             creation_iso = dec_feature.GetField("creation").replace("/", "-")
             creation_dt = datetime.fromisoformat(creation_iso)
-            installation_iso = dec_feature.GetField("date_insta").replace("/", "-")
-            installation_dt = datetime.fromisoformat(installation_iso)
             if linked_dec_dict[dec_fid] is None:
                 linked_dec_dict[dec_fid] = {
                     "creation": creation_dt,
-                    "installation": installation_dt,
                 }
             if (
                 latest_fid is None
                 or linked_dec_dict[latest_fid]["creation"] < creation_dt
             ):
                 latest_fid = dec_fid
+        # Decide if found link will be created, deleted, or ignored
         for dec_fid in list(linked_dec_dict):
             # (declaration_fid, detection_fid) tuple
             link_tuple = (dec_fid, det_fid)
-            if dec_fid != latest_fid:
+            if dec_fid != latest_fid and dec_fid in old_linked_dec_set:
+                # Duplicate existing link: mark for deletion
                 result["del"].add(link_tuple)
-            elif dec_fid not in old_linked_dec_set:
+                if str(link_tuple) not in del_cause_dict:
+                    del_cause_dict[str(link_tuple)] = set()
+                cause = f"Duplicate link for detection {det_fid}"
+                del_cause_dict[str(link_tuple)].add(cause)
+            elif dec_fid == latest_fid and dec_fid not in old_linked_dec_set:
+                # New link: mark for creation
                 result["new"].add(link_tuple)
+            elif dec_fid != latest_fid and dec_fid not in old_linked_dec_set:
+                # Duplicate new link: ignored
+                ignored_new_links_count += 1
+            elif dec_fid == latest_fid and dec_fid in old_linked_dec_set:
+                # Still valid existing link: ignored
+                ignored_old_links_count += 1
         link_layer.SetAttributeFilter(None)
+    del_list = list(result["del"])
+    logger.warning(f"Links deletion list: {del_list} (Count: {len(del_list)})")
+    logger.debug(f"Count of new links to add: {len(result['new'])}")
+    logger.debug(f"Count of ignored new links: {ignored_new_links_count}")
+    logger.debug(f"Count of kept old links: {ignored_old_links_count}")
+    for link_tuple in del_list:
+        message = (
+            f"Link between declaration {link_tuple[0]} "
+            + f"and detection {link_tuple[1]} will be deleted "
+            + f"(Cause·s: {del_cause_dict[str(link_tuple)]})"
+        )
+        logger.warning(message)
     return result
 
 
