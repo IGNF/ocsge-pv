@@ -73,13 +73,11 @@
                 "name": {
                     "description": "Database's name on the host server",
                     "type": "string",
-                    "pattern": "^[a-zA-_][a-zA-Z0-9_]+$|^\".*\"$",
                     "examples": ["ocsge"]
                 },
                 "user": {
                     "description": "User's name",
                     "type": "string",
-                    "pattern": "^[a-zA-_][a-zA-Z0-9_]+$|^\".*\"$",
                     "examples": ["data_producer"]
                 },
                 "password": {
@@ -90,13 +88,11 @@
                 "schema": {
                     "description": "Name of the schema",
                     "type": "string",
-                    "pattern": "^[a-zA-_][a-zA-Z0-9_]+$|^\".*\"$",
                     "examples": ["photovoltaic"]
                 },
                 "table": {
                     "description": "Name of the table",
                     "type": "string",
-                    "pattern": "^[a-zA-_][a-zA-Z0-9_]+$|^\".*\"$",
                     "examples": ["declaration"]
                 }
             },
