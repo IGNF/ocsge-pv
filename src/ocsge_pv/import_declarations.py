@@ -440,38 +440,40 @@ def format_feature(in_data: dict) -> dict:
     return out_data
 
 
-def format_source_result(data: dict) -> list:
+def format_source_result(data: list[dict]) -> list:
     """Transform input data to output data
 
     Args:
-        data (Dict): input data with its original structure
+        data (List[Dict]): input data with its original structure
 
     Returns:
         List: features list with the target SQL table structure
     """
     feature_list = []
     id_list = []
-    for entry in data["demarche"]["dossiers"]["nodes"]:
-        if entry["number"] not in id_list:
-            id_list.append(entry["number"])
-            feature = format_feature(entry)
-            feature_list.append(feature)
+    for page in data:
+        for entry in page["demarche"]["dossiers"]["nodes"]:
+            if entry["number"] not in id_list:
+                id_list.append(entry["number"])
+                feature = format_feature(entry)
+                feature_list.append(feature)
     feature_list.sort(key=lambda feature: feature["id_dossier"])
     return deepcopy(feature_list)
 
 
-def get_deleted_dossier_list(data: dict) -> set:
+def get_deleted_dossier_list(data: list[dict]) -> set:
     """Extract deleted dossiers from input data
 
     Args:
-        data (Dict): input data with its original structure
+        data (List[Dict]): input data with its original structure
 
     Returns:
         set: deleted dossiers id set
     """
     id_set = set()
-    for entry in data["demarche"]["deletedDossiers"]["nodes"]:
-        id_set.add(entry["number"])
+    for page in data:
+        for entry in page["demarche"]["deletedDossiers"]["nodes"]:
+            id_set.add(entry["number"])
     return deepcopy(id_set)
 
 
@@ -570,14 +572,15 @@ def mark_as_deleted(output_conf: dict, data: set) -> None:
             raise exc
 
 
-def query_source_api(input_conf: dict) -> dict:
+def query_source_api(input_conf: dict) -> list[dict]:
     """Read input data from the source GraphQL API
 
     Args:
         input_conf (Dict): configuration used to access the API
 
     Returns:
-        Dict: The converted input data with its original structure
+        List[Dict]: The converted input data structured as a list of dictionaries
+            One dictionary per response page.
     """
     resource_dir = os.environ.get("OCSGE_PV_RESOURCE_DIR")
     if resource_dir is None or resource_dir.strip() == "":
@@ -602,6 +605,7 @@ def query_source_api(input_conf: dict) -> dict:
     query_gql = gql(query_string)
     query_params = {
         "demarcheNumber": input_conf["demarche_id"],
+        "first": 100,
         "includeAnotations": False,
         "includeAvis": False,
         "includeChamps": True,
@@ -622,8 +626,18 @@ def query_source_api(input_conf: dict) -> dict:
     date_filter = input_conf.get("min_update_datetime")
     if date_filter is not None:
         query_params["updatedSince"] = date_filter
-    result = gql_client.execute(query_gql, variable_values=query_params)
-    return deepcopy(result)
+
+    full_raw_result = []
+    last_cursor = None
+    has_next_page = True
+    while has_next_page:
+        if last_cursor is not None:
+            query_params["after"] = last_cursor
+        raw_result = gql_client.execute(query_gql, variable_values=query_params)
+        full_raw_result.append(raw_result)
+        last_cursor = raw_result["demarche"]["dossiers"]["pageInfo"]["endCursor"]
+        has_next_page = raw_result["demarche"]["dossiers"]["pageInfo"]["hasNextPage"]
+    return full_raw_result
 
 
 def write_output(output_conf: dict, data: list) -> None:
