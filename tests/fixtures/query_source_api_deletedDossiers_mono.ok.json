@@ -1,0 +1,33 @@
+[
+  {
+    "pageInfo": {
+      "hasPreviousPage": false,
+      "hasNextPage": false,
+      "startCursor": "hz2JPPb5sy2dzzRT79hMqft3F2rEj7Zv9ijtt7uMZ2a4aFkPrEAd",
+      "endCursor": "9NYWaJiCJcce4csL5gZ4nunyQyW9XvmiMuFnMJJ47go3dXPzt3qR"
+    },
+    "nodes": [
+      {
+        "id": "LZgXioLab4rA4H574jLm5m==",
+        "number": 188399,
+        "dateSupression": "2025-01-24T01:19:58+01:00",
+        "state": "supprime",
+        "reason": "Erreur dans les données saisies."
+      },
+      {
+        "id": "fp3AfHLXPuZtQP2qMWVT94==",
+        "number": 878098,
+        "dateSupression": "2025-01-24T01:19:58+01:00",
+        "state": "supprime",
+        "reason": "Erreur dans les données saisies."
+      },
+      {
+        "id": "KyLhfxF4g5rDc3wvMy32y3==",
+        "number": 553450,
+        "dateSupression": "2025-01-24T01:19:58+01:00",
+        "state": "supprime",
+        "reason": "Erreur dans les données saisies."
+      }
+    ]
+  }
+]

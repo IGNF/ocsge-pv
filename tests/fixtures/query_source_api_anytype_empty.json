@@ -1,0 +1,11 @@
+[
+  {
+    "pageInfo": {
+      "hasPreviousPage": false,
+      "hasNextPage": false,
+      "startCursor": null,
+      "endCursor": null
+    },
+    "nodes": []
+  }
+]

@@ -1,0 +1,57 @@
+[
+  {
+    "pageInfo": {
+      "hasPreviousPage": false,
+      "hasNextPage": true,
+      "startCursor": "hz2JPPb5sy2dzzRT79hMqft3F2rEj7Zv9ijtt7uMZ2a4aFkPrEAd",
+      "endCursor": "9NYWaJiCJcce4csL5gZ4nunyQyW9XvmiMuFnMJJ47go3dXPzt3qR"
+    },
+    "nodes": [
+      {
+        "id": "LZgXioLab4rA4H574jLm5m==",
+        "number": 188399,
+        "dateSupression": "2025-01-24T01:19:58+01:00",
+        "state": "supprime",
+        "reason": "Erreur dans les données saisies."
+      },
+      {
+        "id": "fp3AfHLXPuZtQP2qMWVT94==",
+        "number": 878098,
+        "dateSupression": "2025-01-24T01:19:58+01:00",
+        "state": "supprime",
+        "reason": "Erreur dans les données saisies."
+      },
+      {
+        "id": "KyLhfxF4g5rDc3wvMy32y3==",
+        "number": 553450,
+        "dateSupression": "2025-01-24T01:19:58+01:00",
+        "state": "supprime",
+        "reason": "Erreur dans les données saisies."
+      }
+    ]
+  },
+  {
+    "pageInfo": {
+      "hasPreviousPage": true,
+      "hasNextPage": false,
+      "startCursor": "is4YUffjTMTTWtYECHyieiJ3RH74trUTgbnH7KRLxELpy7vszJbM",
+      "endCursor": "2rzdKrKjguJiEp7y39yLXcDTVLRQputyaNY3vwC5bVvryiheaXVb"
+    },
+    "nodes": [
+      {
+        "id": "2sRpyPk9iiss4LiXP7tMLs==",
+        "number": 917834,
+        "dateSupression": "2025-01-24T01:19:58+01:00",
+        "state": "supprime",
+        "reason": "Erreur dans les données saisies."
+      },
+      {
+        "id": "skoQWwtpRhLXS7wUHx7TZH==",
+        "number": 430305,
+        "dateSupression": "2025-01-24T01:19:58+01:00",
+        "state": "supprime",
+        "reason": "Erreur dans les données saisies."
+      }
+    ]
+  }
+]
