@@ -1,0 +1,277 @@
+[
+  {
+    "pageInfo": {
+      "hasPreviousPage": false,
+      "hasNextPage": true,
+      "startCursor": "fSvPLPdNWZcfVZE9J4eSg2vykN3jJeVJXsqjhUsyMahMzxUq2ePm",
+      "endCursor": "dfXUTVsc9xMaJf9TZLLdUA2nCv9HStqfsQhm4rvWWPTDSf2CncrH"
+    },
+    "nodes": [
+      {
+        "__typename": "Dossier",
+        "id": "kUaxxKpYKstzqbxFkFN34N==",
+        "number": 24420,
+        "archived": false,
+        "prefilled": false,
+        "state": "accepte",
+        "dateDerniereModification": "2025-01-24T01:19:58+01:00",
+        "dateSuppressionParUsager": null,
+        "demarche": {
+          "revision": {
+            "id": "ZZmQjki2xHWYTxDnnuZK3pPkY7PAZr3V"
+          }
+        },
+        "champs": [
+          {
+            "id": "Q2hhbXAtNDAxNDc0OA==",
+            "__typename": "TextChamp",
+            "label": "Attention !",
+            "stringValue": "",
+            "updatedAt": "2024-06-25T17:25:43+02:00",
+            "prefilled": false
+          },
+          {
+            "id": "Q2hhbXAtMzEyNjAwNg==",
+            "__typename": "TextChamp",
+            "label": "Les porteurs de projets d’installations de production d’énergie photovoltaïque dont l’implantation se situe dans un espace naturel ou agricole doivent renseigner les informations suivantes pour les projets dont l'installation est effective à compter du 22 août 2021 (date de la loi n° 2021-1104).",
+            "stringValue": "",
+            "updatedAt": "2024-06-25T17:25:43+02:00",
+            "prefilled": false
+          },
+          {
+            "id": "Q2hhbXAtMzY0MTI3Mw==",
+            "__typename": "CheckboxChamp",
+            "label": "Etes-vous le porteur de projet au sens du décret n° 2023-1408 ?",
+            "stringValue": "true",
+            "updatedAt": "2024-06-25T11:05:17+02:00",
+            "prefilled": false,
+            "checked": true
+          },
+          {
+            "id": "Q2hhbXAtMzY0MTI3Nw==",
+            "__typename": "CheckboxChamp",
+            "label": "Je certifie être autorisé à déclarer cette installation de production d’énergie photovoltaïque selon le décret n° 2023-1408.",
+            "stringValue": "true",
+            "updatedAt": "2024-06-25T11:06:11+02:00",
+            "prefilled": false,
+            "checked": true
+          }
+        ]
+      },
+      {
+        "__typename": "Dossier",
+        "id": "TsPLAELoSzKwqUqj5YW7E9==",
+        "number": 617588,
+        "archived": false,
+        "prefilled": false,
+        "state": "accepte",
+        "dateDerniereModification": "2025-01-24T01:19:58+01:00",
+        "dateSuppressionParUsager": null,
+        "demarche": {
+          "revision": {
+            "id": "ZZmQjki2xHWYTxDnnuZK3pPkY7PAZr3V"
+          }
+        },
+        "champs": [
+          {
+            "id": "Q2hhbXAtNDAxNDc0OA==",
+            "__typename": "TextChamp",
+            "label": "Attention !",
+            "stringValue": "",
+            "updatedAt": "2024-06-25T17:25:43+02:00",
+            "prefilled": false
+          },
+          {
+            "id": "Q2hhbXAtMzEyNjAwNg==",
+            "__typename": "TextChamp",
+            "label": "Les porteurs de projets d’installations de production d’énergie photovoltaïque dont l’implantation se situe dans un espace naturel ou agricole doivent renseigner les informations suivantes pour les projets dont l'installation est effective à compter du 22 août 2021 (date de la loi n° 2021-1104).",
+            "stringValue": "",
+            "updatedAt": "2024-06-25T17:25:43+02:00",
+            "prefilled": false
+          },
+          {
+            "id": "Q2hhbXAtMzY0MTI3Mw==",
+            "__typename": "CheckboxChamp",
+            "label": "Etes-vous le porteur de projet au sens du décret n° 2023-1408 ?",
+            "stringValue": "true",
+            "updatedAt": "2024-06-25T11:05:17+02:00",
+            "prefilled": false,
+            "checked": true
+          },
+          {
+            "id": "Q2hhbXAtMzY0MTI3Nw==",
+            "__typename": "CheckboxChamp",
+            "label": "Je certifie être autorisé à déclarer cette installation de production d’énergie photovoltaïque selon le décret n° 2023-1408.",
+            "stringValue": "true",
+            "updatedAt": "2024-06-25T11:06:11+02:00",
+            "prefilled": false,
+            "checked": true
+          }
+        ]
+      },
+      {
+        "__typename": "Dossier",
+        "id": "W5VaWFMxuWe9ZTNdsYeVQQ==",
+        "number": 530226,
+        "archived": false,
+        "prefilled": false,
+        "state": "accepte",
+        "dateDerniereModification": "2025-01-24T01:19:58+01:00",
+        "dateSuppressionParUsager": null,
+        "demarche": {
+          "revision": {
+            "id": "ZZmQjki2xHWYTxDnnuZK3pPkY7PAZr3V"
+          }
+        },
+        "champs": [
+          {
+            "id": "Q2hhbXAtNDAxNDc0OA==",
+            "__typename": "TextChamp",
+            "label": "Attention !",
+            "stringValue": "",
+            "updatedAt": "2024-06-25T17:25:43+02:00",
+            "prefilled": false
+          },
+          {
+            "id": "Q2hhbXAtMzEyNjAwNg==",
+            "__typename": "TextChamp",
+            "label": "Les porteurs de projets d’installations de production d’énergie photovoltaïque dont l’implantation se situe dans un espace naturel ou agricole doivent renseigner les informations suivantes pour les projets dont l'installation est effective à compter du 22 août 2021 (date de la loi n° 2021-1104).",
+            "stringValue": "",
+            "updatedAt": "2024-06-25T17:25:43+02:00",
+            "prefilled": false
+          },
+          {
+            "id": "Q2hhbXAtMzY0MTI3Mw==",
+            "__typename": "CheckboxChamp",
+            "label": "Etes-vous le porteur de projet au sens du décret n° 2023-1408 ?",
+            "stringValue": "true",
+            "updatedAt": "2024-06-25T11:05:17+02:00",
+            "prefilled": false,
+            "checked": true
+          },
+          {
+            "id": "Q2hhbXAtMzY0MTI3Nw==",
+            "__typename": "CheckboxChamp",
+            "label": "Je certifie être autorisé à déclarer cette installation de production d’énergie photovoltaïque selon le décret n° 2023-1408.",
+            "stringValue": "true",
+            "updatedAt": "2024-06-25T11:06:11+02:00",
+            "prefilled": false,
+            "checked": true
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "pageInfo": {
+      "hasPreviousPage": true,
+      "hasNextPage": false,
+      "startCursor": "2sZLLoMaWMuNPjkzSim9iSeKYHdM3VsZX3VNeuiNxQFYi7WTCFMk",
+      "endCursor": "xfhsLKbXPkvcvuLa9Qobj9RYbvY5nkFeSpuAAEAJsuetn5m37DRC"
+    },
+    "nodes": [
+      {
+        "__typename": "Dossier",
+        "id": "Dm4VMs5vXY4MFmFUQTabbY==",
+        "number": 778569,
+        "archived": false,
+        "prefilled": false,
+        "state": "accepte",
+        "dateDerniereModification": "2025-01-24T01:19:58+01:00",
+        "dateSuppressionParUsager": null,
+        "demarche": {
+          "revision": {
+            "id": "ZZmQjki2xHWYTxDnnuZK3pPkY7PAZr3V"
+          }
+        },
+        "champs": [
+          {
+            "id": "Q2hhbXAtNDAxNDc0OA==",
+            "__typename": "TextChamp",
+            "label": "Attention !",
+            "stringValue": "",
+            "updatedAt": "2024-06-25T17:25:43+02:00",
+            "prefilled": false
+          },
+          {
+            "id": "Q2hhbXAtMzEyNjAwNg==",
+            "__typename": "TextChamp",
+            "label": "Les porteurs de projets d’installations de production d’énergie photovoltaïque dont l’implantation se situe dans un espace naturel ou agricole doivent renseigner les informations suivantes pour les projets dont l'installation est effective à compter du 22 août 2021 (date de la loi n° 2021-1104).",
+            "stringValue": "",
+            "updatedAt": "2024-06-25T17:25:43+02:00",
+            "prefilled": false
+          },
+          {
+            "id": "Q2hhbXAtMzY0MTI3Mw==",
+            "__typename": "CheckboxChamp",
+            "label": "Etes-vous le porteur de projet au sens du décret n° 2023-1408 ?",
+            "stringValue": "true",
+            "updatedAt": "2024-06-25T11:05:17+02:00",
+            "prefilled": false,
+            "checked": true
+          },
+          {
+            "id": "Q2hhbXAtMzY0MTI3Nw==",
+            "__typename": "CheckboxChamp",
+            "label": "Je certifie être autorisé à déclarer cette installation de production d’énergie photovoltaïque selon le décret n° 2023-1408.",
+            "stringValue": "true",
+            "updatedAt": "2024-06-25T11:06:11+02:00",
+            "prefilled": false,
+            "checked": true
+          }
+        ]
+      },
+      {
+        "__typename": "Dossier",
+        "id": "7EjbqWWWEx4ouFxDw4JnUc==",
+        "number": 972617,
+        "archived": false,
+        "prefilled": false,
+        "state": "accepte",
+        "dateDerniereModification": "2025-01-24T01:19:58+01:00",
+        "dateSuppressionParUsager": null,
+        "demarche": {
+          "revision": {
+            "id": "ZZmQjki2xHWYTxDnnuZK3pPkY7PAZr3V"
+          }
+        },
+        "champs": [
+          {
+            "id": "Q2hhbXAtNDAxNDc0OA==",
+            "__typename": "TextChamp",
+            "label": "Attention !",
+            "stringValue": "",
+            "updatedAt": "2024-06-25T17:25:43+02:00",
+            "prefilled": false
+          },
+          {
+            "id": "Q2hhbXAtMzEyNjAwNg==",
+            "__typename": "TextChamp",
+            "label": "Les porteurs de projets d’installations de production d’énergie photovoltaïque dont l’implantation se situe dans un espace naturel ou agricole doivent renseigner les informations suivantes pour les projets dont l'installation est effective à compter du 22 août 2021 (date de la loi n° 2021-1104).",
+            "stringValue": "",
+            "updatedAt": "2024-06-25T17:25:43+02:00",
+            "prefilled": false
+          },
+          {
+            "id": "Q2hhbXAtMzY0MTI3Mw==",
+            "__typename": "CheckboxChamp",
+            "label": "Etes-vous le porteur de projet au sens du décret n° 2023-1408 ?",
+            "stringValue": "true",
+            "updatedAt": "2024-06-25T11:05:17+02:00",
+            "prefilled": false,
+            "checked": true
+          },
+          {
+            "id": "Q2hhbXAtMzY0MTI3Nw==",
+            "__typename": "CheckboxChamp",
+            "label": "Je certifie être autorisé à déclarer cette installation de production d’énergie photovoltaïque selon le décret n° 2023-1408.",
+            "stringValue": "true",
+            "updatedAt": "2024-06-25T11:06:11+02:00",
+            "prefilled": false,
+            "checked": true
+          }
+        ]
+      }
+    ]
+  }
+]
