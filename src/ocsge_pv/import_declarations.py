@@ -387,17 +387,19 @@ def format_feature(in_data: dict) -> dict:
     return out_data
 
 
-def format_source_result(data: list[dict]) -> list:
+def format_source_result(data: list[dict]) -> list[dict]:
     """Transform input data to output data
 
     Args:
         data (List[Dict]): raw data as returned by query_source_api
 
     Returns:
-        List: features list with the target SQL table structure
+        List[Dict]: features list with the target SQL table structure
     """
     feature_list = []
     id_list = []
+    # debug_input_str = json.dumps(data, sort_keys=True, default=str)
+    # logger.debug(f"Raw input data: {debug_input_str}")
     for page in data["demarche"]["dossiers"]:
         for entry in page["nodes"]:
             if entry["number"] not in id_list:
@@ -405,6 +407,8 @@ def format_source_result(data: list[dict]) -> list:
                 feature = format_feature(entry)
                 feature_list.append(feature)
     feature_list.sort(key=lambda feature: feature["id_dossier"])
+    # debug_output_str = json.dumps(feature_list, sort_keys=True, default=str)
+    # logger.debug(f"Output data: {debug_output_str}")
     return deepcopy(feature_list)
 
 
@@ -609,8 +613,10 @@ def write_output(output_conf: dict, data: list) -> None:
         data (List): list of output data to insert
     """
     keys_list = None
-    values_list = None
     line_writing_mode = None
+    values_list = None
+    value_dict = None
+    cur = None
     with psycopg.connect(output_conf["_pg_string"], autocommit=True) as conn:
         cur = conn.cursor()
         try:
@@ -621,9 +627,9 @@ def write_output(output_conf: dict, data: list) -> None:
                 out_srid = int(
                     cur.execute(
                         sql.SQL("SELECT Find_SRID({schema}, {table}, {column})").format(
-                            schema=sql.Placeholder("schema"),
-                            table=sql.Placeholder("table"),
-                            column=sql.Placeholder("column"),
+                            schema=sql.Placeholder("schema", psycopg.adapt.PyFormat.TEXT),
+                            table=sql.Placeholder("table", psycopg.adapt.PyFormat.TEXT),
+                            column=sql.Placeholder("column", psycopg.adapt.PyFormat.TEXT),
                         ),
                         {
                             "schema": output_conf["schema"],
@@ -654,7 +660,7 @@ def write_output(output_conf: dict, data: list) -> None:
                     ).fetchone()
                     if id_count_row[0] > 1:
                         raise ValueError(
-                            "To many declarations found in database with id_dossier="
+                            "Too many declarations found in database with id_dossier="
                             + f"{feature['id_dossier']}: {id_count_row[0]} entries found."
                         )
                     keys_list = []
@@ -712,7 +718,19 @@ def write_output(output_conf: dict, data: list) -> None:
                             instruction,
                             value_dict,
                         )
-
+        except psycopg.Error as exc:
+            logger.error(f"PostgreSQL error code: {exc.sqlstate}")
+            logger.error(f"PG_DIAG_CONTEXT: {exc.diag.context}")
+            logger.error(f"PG_DIAG_MESSAGE_PRIMARY: {exc.diag.message_primary}")
+            logger.error(f"PG_DIAG_MESSAGE_DETAIL: {exc.diag.message_detail}")
+            logger.error(f"PG_DIAG_MESSAGE_HINT: {exc.diag.message_hint}")
+            logger.error(
+                f"Cursor query: (raw_query: {cur._query.query}, parameters: {cur._query.params})"
+            )
+            conn.rollback()
+            logger.error(f"Line writing mode: '{line_writing_mode}'\n")
+            logger.error(f"Values mapping: '{value_dict}'\n")
+            raise exc
         except Exception as exc:
             conn.rollback()
             logger.error(f"Line writing mode: '{line_writing_mode}'\n")

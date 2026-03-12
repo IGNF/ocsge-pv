@@ -1,0 +1,16 @@
+{
+    "output": {
+        "host": "storage_bdd.localhost",
+        "port": 5432,
+        "name": "datastore",
+        "user": "entrepot",
+        "password": "mdp_entrepot",
+        "schema": "demarche_numerique",
+        "table": "declaration"
+    },
+    "input": {
+        "api_url": "https://demarche.numerique.gouv.fr/api/v2/graphql",
+        "auth_token": "YzQ3YzYzOGYtMDY0NS00N2EyLWJkYTQtY2YyYzNlOTUyZjMyO0JYdWd3UUJMS0FtTGJaVGVZcWZLeng0cQ==",
+        "demarche_id": 86067
+    }
+}
