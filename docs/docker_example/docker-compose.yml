@@ -1,0 +1,155 @@
+name: ocsge-pv-local-nover
+
+networks:
+  default:
+    driver: bridge
+
+services:
+  main:
+    build:
+      args:
+        - HOST_UID=$HOST_UID
+        - HOST_GID=$HOST_GID
+        - http_proxy=$http_proxy
+        - HTTP_PROXY=$HTTP_PROXY
+        - https_proxy=$https_proxy
+        - HTTPS_PROXY=$HTTPS_PROXY
+      context: $OCSGE_PV_REPO_PATH/
+      dockerfile: $OCSGE_PV_REPO_PATH/Dockerfile
+      network: host
+      tags:
+        - "local/ignf/ocsge-pv:latest"
+        - "local/ignf/ocsge-pv:nover"
+    command: sleep 7d
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      initdb:
+        condition: service_completed_successfully
+    environment:
+      DS_GQL_API_AUTH: $DS_GQL_API_AUTH
+      HOST_UID: $HOST_UID
+      HOST_GID: $HOST_GID
+      http_proxy: $http_proxy
+      HTTP_PROXY: $HTTP_PROXY
+      https_proxy: $https_proxy
+      HTTPS_PROXY: $HTTPS_PROXY
+      no_proxy:
+      NO_PROXY:
+      PGDATABASE: "datastore"
+      PGHOST: storage_bdd.localhost
+      PGPASSWORD: "mdp_entrepot"
+      PGPORT: "5432"
+      PGUSER: "entrepot"
+      TZ: ${TZ:-Europe/Paris}
+    image: local/ignf/ocsge-pv:nover
+    links:
+      - postgresql:storage_bdd.localhost
+    networks:
+      - default
+    volumes:
+      - $OCSGE_PV_REPO_PATH/pyproject.toml:/app/pyproject.toml
+      - $OCSGE_PV_REPO_PATH/src/ocsge_pv:/app/src/ocsge_pv
+      - $OCSGE_PV_REPO_PATH/tests:/app/tests
+      - $OCSGE_PV_REPO_PATH/docs:/app/docs
+      - $OCSGE_PV_REPO_PATH/.git:/app/.git
+      - $OCSGE_PV_DATA_PATH:/home/user/data
+      - $OCSGE_PV_CONF_PATH:/home/user/conf
+      - $OCSGE_PV_SQL_SCRIPTS_PATH:/home/user/sql
+
+  dev:
+    build:
+      args:
+        - HOST_UID=$HOST_UID
+        - HOST_GID=$HOST_GID
+        - http_proxy=$http_proxy
+        - HTTP_PROXY=$HTTP_PROXY
+        - https_proxy=$https_proxy
+        - HTTPS_PROXY=$HTTPS_PROXY
+      context: $OCSGE_PV_REPO_PATH/
+      dockerfile: $PWD/dev.Dockerfile
+      network: host
+      tags:
+        - "local/ignf/ocsge-pv-dev:latest"
+        - "local/ignf/ocsge-pv-dev:nover"
+    command: sleep 7d
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      initdb:
+        condition: service_completed_successfully
+    environment:
+      DS_GQL_API_AUTH: $DS_GQL_API_AUTH
+      HOST_UID: $HOST_UID
+      HOST_GID: $HOST_GID
+      http_proxy: $http_proxy
+      HTTP_PROXY: $HTTP_PROXY
+      https_proxy: $https_proxy
+      HTTPS_PROXY: $HTTPS_PROXY
+      no_proxy:
+      NO_PROXY:
+      PGDATABASE: "datastore"
+      PGHOST: storage_bdd.localhost
+      PGPASSWORD: "mdp_entrepot"
+      PGPORT: "5432"
+      PGUSER: "entrepot"
+      TZ: ${TZ:-Europe/Paris}
+    image: local/ignf/ocsge-pv-dev:nover
+    links:
+      - postgresql:storage_bdd.localhost
+    networks:
+      - default
+    volumes:
+      - $OCSGE_PV_REPO_PATH/pyproject.toml:/app/pyproject.toml
+      - $OCSGE_PV_REPO_PATH/src/ocsge_pv:/app/src/ocsge_pv
+      - $OCSGE_PV_REPO_PATH/tests:/app/tests
+      - $OCSGE_PV_REPO_PATH/docs:/app/docs
+      - $OCSGE_PV_REPO_PATH/.git:/app/.git
+      - $OCSGE_PV_DATA_PATH:/home/user/data
+      - $OCSGE_PV_CONF_PATH:/home/user/conf
+      - $OCSGE_PV_SQL_SCRIPTS_PATH:/home/user/sql
+
+  initdb:
+    command: ["psql", "-f", "/opt/sql_scripts/init-db-import_declarations.sql", "-f", "/opt/sql_scripts/init-db-paired_data.no_id_generation.sql" ]
+    depends_on:
+      postgresql:
+       condition: service_healthy
+    environment:
+      PGDATABASE: "datastore"
+      PGHOST: storage_bdd.localhost
+      PGPASSWORD: "mdp_entrepot"
+      PGPORT: "5432"
+      PGUSER: "entrepot"
+      TZ: ${TZ:-Europe/Paris}
+    entrypoint: []
+    image: postgis/postgis:14-3.4
+    networks:
+      - default
+    volumes:
+      - $OCSGE_PV_SQL_SCRIPTS_PATH:/opt/sql_scripts
+
+  postgresql:
+    environment:
+      ALLOW_IP_RANGE: "0.0.0.0/0"
+      HOST_UID: $HOST_UID
+      HOST_GID: $HOST_GID
+      POSTGRES_DB: "datastore"
+      POSTGRES_PASSWORD: "mdp_entrepot"
+      POSTGRES_USER: "entrepot"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready", "-d", "db_prod"]
+      interval: 30s
+      timeout: 60s
+      retries: 5
+    hostname: storage_bdd.localhost
+    image: postgis/postgis:14-3.4
+    networks:
+      - default
+    ports:
+      - "5437:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - $OCSGE_PV_SQL_SCRIPTS_PATH:/opt/sql_scripts
+
+volumes:
+  pgdata:
