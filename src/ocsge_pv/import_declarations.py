@@ -45,17 +45,14 @@ from gql.transport.aiohttp import log as AIOHTTPTransport_logger
 from osgeo import ogr, osr
 from psycopg import sql
 
+from ocsge_pv.custom_logging import LoggerInterface
+
 # -- GLOBALS --
 
 
 NAME = "import_declarations"
-logging.basicConfig(
-    level=logging.INFO,
-    format=r"%(asctime)s %(name)s\(%(funcName)s\) %(levelname)s: %(message)s",
-)
-# logging.captureWarnings(True)
 AIOHTTPTransport_logger.setLevel(logging.WARNING)
-logger = logging.getLogger(NAME)
+logger = LoggerInterface(NAME, "USER", "")
 ogr.UseExceptions()
 osr.UseExceptions()
 SOURCE_SRID = 4326
@@ -467,6 +464,18 @@ def load_configuration(path: Path) -> dict:
             + " password="
             + modified_configuration["output"]["password"]
         )
+        if (
+            source_configuration["input"]["auth_token"] is None
+            or source_configuration["input"]["auth_token"] == ""
+        ):
+            modified_configuration["input"]["auth_token"] = os.environ.get("DS_GQL_API_AUTH")
+        if (
+            modified_configuration["input"]["auth_token"] is None
+            or source_configuration["input"]["auth_token"] == ""
+        ):
+            raise ValueError(
+                "Source API auth token is empty both in the configuration file and in the 'DS_GQL_API_AUTH' environment variable."
+            )
         return modified_configuration
     except Exception as exc:
         raise exc

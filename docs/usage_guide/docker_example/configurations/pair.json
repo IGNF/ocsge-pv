@@ -3,8 +3,8 @@
         "host": "storage_bdd.localhost",
         "port": 5432,
         "name": "datastore",
-        "user": "entrepot",
-        "password": "mdp_entrepot",
+        "user": "utilisateur_traitement",
+        "password": "mdp_traitement",
         "schema": "pairing",
         "tables": {
             "detections": "detection",

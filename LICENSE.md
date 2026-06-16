@@ -1,3 +1,5 @@
+# LICENSE
+
 MIT License
 
 Copyright (c) 2024 Institut National de l'Information Géographique et Forestière

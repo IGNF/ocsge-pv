@@ -6,6 +6,18 @@ Ce projet traite des données obtenues depuis deux sources :
 * Données de télédétection à partir de photographies aériennes
 * Dossiers de déclaration sur le formulaire [declaration_pv_decret2023-1408](https://www.demarches-simplifiees.fr/commencer/declaration_pv_decret2023-1408) du service "demarches-simplifiees.fr".
 
+## Compilation locale de la documentation
+La documentation au format HTML, hors de ce fichier README, peut être obtenue par les commandes suivantes, dupuis la racine du projet :
+
+```sh
+pip install .[doc]
+mkdocs build # Pour générer le contenu statique du site HTML vers le dossier "public/"
+# ou
+mkdocs serve # Pour directement publier le site HTML sur un serveur local. (Adresse dans les logs.)
+```
+
+*TODO: harmoniser les contenus de la doc principale et de ce README, pour léimiter la redondance inutile. Ce README est plutôt un point d'entrée vers le projet github ou le dépôt de code.*
+
 ## Utilisation
 Le programme est séparé en plusieurs exécutables :
 * `import_declarations` : Importe les données sur les déclarations d'installations photovoltaïques vers une base de données PostgreSQL+PostGIS.
@@ -19,7 +31,7 @@ La configuration se présente sous la forme d'un fichier json. Les schémas de v
 
 ## Installation
 (Commandes exécutées depuis la racine du projet.)
-Différentes méthodes sont possibles
+Différentes méthodes sont possibles.
 
 ### Depuis le dépôt d'images docker
 **En construction**
@@ -48,20 +60,28 @@ Les fichiers sql liés décrivent un exemple de cas d'utilisation avec :
 * un schéma pour le reste des opérations (appariement des données, puis diffusion et visualisation des données appariées, etc)
 
 ### Données de déclarations brutes
-Voir [src/resources/init_declaration_source_db_schema.sql](./src/resources/init_declaration_source_db_schema.sql)
+Voir [docs/docker_example/sql_scripts/init-db-import_declarations.sql](./docs/docker_example/sql_scripts/init-db-import_declarations.sql)
 Les exécutables suivants utilisent ces données :
 * `import_declarations`
 
 Toutes les colonnes citée dans le fichier SQL d'exemple sont obligatoires pour le fonctionnement des exécutables ci-dessus.
 
-Les colonnes suivantes sont utilisée pour filtrer l'export de données depuis cette table :
+Les colonnes suivantes sont utilisées pour filtrer l'export de données depuis cette table :
 * `accepte`
 * `dern_modif`
 * `archive`
 * `supprime`
 
 ### Données de travail et de diffusion
-Voir [src/resources/init_declaration_source_db_schema.sql](./src/resources/init_aggregation_db_schema.sql)
+Voir un de ces deux fichiers :
+* [docs/docker_example/sql_scripts/init-db-paired_data.no_id_generation.sql](./docs/docker_example/sql_scripts/init-db-paired_data.no_id_generation.sql)
+    * Force une valeur automatique lors de l'insertion pour la colonne de clé primaire "pairing.detection.id_millesime" : = (("pairing.detection.id" * 10000000) + "pairing.detection.millesime")
+    * Il faut donc **ne pas** fournir de valeur pour cette colonne lors des insertions en base.
+* [docs/docker_example/sql_scripts/init-db-paired_data.with_id_generation.sql](./docs/docker_example/sql_scripts/init-db-paired_data.with_id_generation.sql)
+    * Ne définit pas de valeur automatique pour la colonne de clé primaire "pairing.detection.id_millesime".
+    * La valeur doit donc être fournie lors des insertions en base. (Attendue avec la même formule que dans sa version générée.)
+    * Ce script SQL est prévu pour des plateformes qui gèreraient mal l'insertion des données initiales dans la base, en provoquant des conflits sur les colonnes de clé primaire générées.
+
 Les exécutables suivants utilisent ces données :
 * `pair_from_sources`
 * `delete_data`

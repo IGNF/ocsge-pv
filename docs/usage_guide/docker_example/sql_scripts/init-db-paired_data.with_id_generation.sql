@@ -72,6 +72,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS declaration_detection_idx
 -- View used as the underlying data for public diffusion
 CREATE OR REPLACE VIEW pairing.donnees_agregees AS
     SELECT
+        "detection"."id_millesime",
         "detection"."id",
         "detection"."millesime",
         "detection"."long",

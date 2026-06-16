@@ -25,13 +25,13 @@ repos:
     rev: "v0.5.0"
     hooks:
       - id: ruff
-        args: ["--fix-only", "--target-version=py38"]
+        args: ["--fix-only", "--target-version=py38", "--line-length=100"]
 
   - repo: https://github.com/psf/black
     rev: 24.4.2
     hooks:
       - id: black
-        args: ["--target-version=py310"]
+        args: ["--target-version=py310", "--line-length=100"]
 
   - repo: https://github.com/pycqa/isort
     rev: 5.13.2

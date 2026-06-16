@@ -22,12 +22,15 @@ classifiers = [
 
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Programming Language :: Python :: 3 :: Only",
 ]
 
 dependencies = [
-  # "GDAL >= 3.6.2",
+  # "GDAL == $(gdal-config --version)", # Must be the same exact version as the system's gdal libraries (libgdal).
   "gql[aiohttp]",
   "psycopg",
   "jsonschema >= 4.23.0"
@@ -35,7 +38,10 @@ dependencies = [
 
 [project.optional-dependencies]
 doc = [
-  "pdoc"
+  "mkdocs >= 1.6, < 2",
+  "mkdocstrings[python] >= 1.0",
+  "mkdocs-extrafiles >= 1.0",
+  "mkdocs-material >= 9.7"
 ]
 
 dev = [
@@ -57,12 +63,17 @@ test = [
 "Source" = "https://github.com/IGNF/ocsge-pv"
 
 [project.scripts]
+# Concatenation of alls commands CLI help outputs
 ocsge-pv-help = "ocsge_pv.ocsge_pv_help:main"
 ocsge-pv = "ocsge_pv.ocsge_pv_help:main"
-delete_data = "ocsge_pv.delete_data:main"
+ocsge_pv_help = "ocsge_pv.ocsge_pv_help:main"
+ocsge_pv = "ocsge_pv.ocsge_pv_help:main"
+# Declarative data import
 import_declarations = "ocsge_pv.import_declarations:main"
-geometrize_declarations = "ocsge_pv.geometrize_declarations:main"
+# Declarative data X observation data pairing
 pair_from_sources = "ocsge_pv.pair_from_sources:main"
+# Objects deletion from data
+delete_data = "ocsge_pv.delete_data:main"
 
 [build-system]
 requires = ["setuptools", "wheel"]

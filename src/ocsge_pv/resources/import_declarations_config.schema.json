@@ -1,33 +1,38 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "import_declarations_config",
-    "title": "Declarations importer configuration",
-    "description": "The configuration for the declarations import program",
+    "title": "[FR] Configuration de l'import de données déclaratives\n[EN] Declarative data import configuration",
+    "description": "[FR] Schéma de configuration pour l'exécutable 'import_declarations'\n[EN] Configuration schema for the 'import_declarations' executable",
     "type": "object",
     "properties": {
         "input": {
-            "description": "Source datasource for declarations (demarches-simplifiees.fr service)",
+            "title": "[FR] Source des données en entrée\n[EN] Input datasource",
+            "description": "[FR] Paramètres liés à la source des données déclaratives\n[EN] Declarative data source request parameters",
             "type": "object",
             "properties": {
                 "api_url": {
-                    "description": "Root url for the GraphQL API.",
+                    "title": "[FR] URL racine de l'API\n[EN] API root URL",
+                    "description": "[FR] URL racine de l'API GraphQL du service source\n[EN] Root URL for the source service GraphQL API",
                     "type": "string",
                     "format": "uri",
                     "examples": ["https://www.demarches-simplifiees.fr/api/v2/graphql"]
                 },
                 "auth_token": {
-                    "description": "Authentification token required to use the API.",
+                    "title": "[FR] Jeton d'authentification sur l'API\n[EN] API authentification token",
+                    "description": "[FR] Jeton à utiliser pour s'authentifier sur l'API source (doit disposer du rôle administrateur sur la démarche)\n[EN] Token required to authenticate on the source API (must have an administrator role on the 'démarche')",
                     "type": "string",
                     "pattern": "^[A-Za-z0-9+~/._-]+=?=",
                     "examples": ["A9Knc34tP=="]
                 },
                 "demarche_id": {
-                    "description": "Identifier for the procedure.",
+                    "title": "[FR] Identifiant de la démarche\n[EN] 'demarche' identifier",
+                    "description": "[FR] Identifiant de la démarche sur le service source\n[EN] Identifier for the procedure on the source service.",
                     "type": "integer",
                     "examples": [1546]
                 },
                 "min_update_datetime" : {
-                    "description": "Filter out any dossier before this Date/Time (optional, default to null). See RFC 3339 section 5.6 for a syntax guide.",
+                    "title": "[FR] Date minimale de dernière mise à jour\n[EN] Minimal last update date and time",
+                    "description": "[FR] Ignorera tous les dossiers dont la dernière mise à jour est antérieure à ce moment (optionnel, vide par défaut). La syntaxe est définie par la RFC 3339 section 5.6.\n[EN] Filter out any dossier before this Date/Time (optional, default to null). See RFC 3339 section 5.6 for a syntax guide.",
                     "type": "string",
                     "format": "date-time",
                     "examples": [
@@ -44,11 +49,13 @@
             ]
         },
         "output": {
-            "description": "Target datasource for declared photovoltaic installations",
+            "title": "[FR] Base de données en sortie\n[EN] Output database",
+            "description": "[FR] Base données où insérer les objets importés\n[EN] Database where imported object will be inserted",
             "type": "object",
             "properties": {
                 "host": {
-                    "description": "Database hostname",
+                    "title": "[FR] Adresse hôte\n[EN] Host address",
+                    "description": "[FR] Adresse URL ou IP de l'hôte BDD\n[EN] DB host's URL or IP address",
                     "type": "string",
                     "anyOf": [
                         {
@@ -66,32 +73,38 @@
                     ]
                 },
                 "port": {
-                    "description": "Database host's port",
+                    "title": "[FR] Port hôte\n[EN] Host port",
+                    "description": "[FR] Port d'accès à la BDD sur l'hôte\n[EN] DB access port on the host",
                     "type": "integer",
                     "examples": [5432]
                 },
                 "name": {
-                    "description": "Database's name on the host server",
+                    "title": "[FR] Nom de la BDD\n[EN] DB name",
+                    "description": "[FR] Nom de la BDD sur le serveur hôte\n[EN] Database's name on the host server",
                     "type": "string",
                     "examples": ["ocsge"]
                 },
                 "user": {
-                    "description": "User's name",
+                    "title": "[FR] Nom de l'utilisateur\n[EN] User name",
+                    "description": "[FR] Nom d'utilisateur pour accéder à la BDD\n[EN] User name for DB access",
                     "type": "string",
                     "examples": ["data_producer"]
                 },
                 "password": {
-                    "description": "User's password",
+                    "title": "[FR] Mot de passe de l'utilisateur\n[EN] User password",
+                    "description": "[FR] Mot de passe pour accéder à la BDD\n[EN] User password for DB access",
                     "type": "string",
                     "examples": ["bip-boop-123456"]
                 },
                 "schema": {
-                    "description": "Name of the schema",
+                    "title": "[FR] Nom du schéma\n[EN] Schema name",
+                    "description": "[FR] Nom du schéma de destination sur la BDD SQL\n[EN] Destination schema name on the SQL BDD",
                     "type": "string",
                     "examples": ["photovoltaic"]
                 },
                 "table": {
-                    "description": "Name of the table",
+                    "title": "[FR] Nom de la table\n[EN] Table name",
+                    "description": "[FR] Nom de la table de destination dans le schéma\n[EN] Destination table name in the schema",
                     "type": "string",
                     "examples": ["declaration"]
                 }

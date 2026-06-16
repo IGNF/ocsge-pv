@@ -1,9 +1,6 @@
--- Minimal requirements for tables used in this project's data import part
--- Include the definition of the view for web services
-
--- Declarations as extracted and archived from the source web service
--- Some columns are used only for filtering exports
-CREATE TABLE IF NOT EXISTS "full_declaration" (
+-- Minimal requirements for tables used in this project's pimportiring part
+CREATE SCHEMA IF NOT EXISTS raw_import;
+CREATE TABLE IF NOT EXISTS raw_import.declaration (
     "id_dossier" bigint PRIMARY KEY,
     "porteur" bool,
     "siret_port" char(14),
@@ -39,9 +36,9 @@ CREATE TABLE IF NOT EXISTS "full_declaration" (
     "ex_agriv" bool,
     "ex_techniq" bool,
     "creation" timestamp (0) with time zone,
-    "geom" geometry(MULTIPOLYGON,2154),
-    "dern_modif" timestamp (0) with time zone,
     "archive" bool,
+    "dern_modif" timestamp (0) with time zone,
     "statut" text,
-    "supprime" bool
+    "supprime" bool,
+    "geom" geometry(MULTIPOLYGON,2154)
 );

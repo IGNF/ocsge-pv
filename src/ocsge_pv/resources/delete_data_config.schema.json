@@ -1,16 +1,18 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "delete_configuration",
-    "title": "Data deletion configuration",
-    "description": "The configuration for the data deletion program",
+    "title": "[FR] Configuration de la suppression de données\n[EN] Data deletion configuration",
+    "description": "[FR] Schéma de validation de la configuration pour l'exécutable 'delete_data'\n[EN] Validation schema for the configuration file required by the executable 'delete_data'",
     "type": "object",
     "properties": {
         "main_database": {
-            "description": "Connection details: access to database tables describing photovoltaic installations (detected, declared, or the links between the two)",
+            "title": "[FR] Base de données cible\n[EN] Target database",
+            "description": "[FR] Informations d'accès aux données en entrée/sortie dans leur base de données\n[EN] Connection and navigation information to access the input/output data in their database",
             "type": "object",
             "properties": {
                 "host": {
-                    "description": "Database hostname",
+                    "title": "[FR] Adresse hôte\n[EN] Host address",
+                    "description": "[FR] Adresse URL ou IP de l'hôte BDD\n[EN] DB host's URL or IP address",
                     "type": "string",
                     "anyOf": [
                         {
@@ -25,39 +27,48 @@
                     ]
                 },
                 "port": {
-                    "description": "Database host's port",
+                    "title": "[FR] Port hôte\n[EN] Host port",
+                    "description": "[FR] Port d'accès à la BDD sur l'hôte\n[EN] DB access port on the host",
                     "type": "integer"
                 },
                 "name": {
-                    "description": "Database's name on the host server",
+                    "title": "[FR] Nom de la BDD\n[EN] DB name",
+                    "description": "[FR] Nom de la BDD sur le serveur hôte\n[EN] Database's name on the host server",
                     "type": "string"
                 },
                 "user": {
-                    "description": "User's name",
+                    "title": "[FR] Nom de l'utilisateur\n[EN] User name",
+                    "description": "[FR] Nom d'utilisateur pour accéder à la BDD\n[EN] User name for DB access",
                     "type": "string"
                 },
                 "password": {
-                    "description": "User's password",
+                    "title": "[FR] Mot de passe de l'utilisateur\n[EN] User password",
+                    "description": "[FR] Mot de passe pour accéder à la BDD\n[EN] User password for DB access",
                     "type": "string"
                 },
                 "schema": {
-                    "description": "Name of the schema",
+                    "title": "[FR] Nom du schéma\n[EN] Schema name",
+                    "description": "[FR] Nom du schéma ciblé sur la BDD SQL\n[EN] Target schema name on the SQL BDD",
                     "type": "string"
                 },
                 "tables": {
-                    "description": "Name of the tables",
+                    "title": "[FR] Nom des tables\n[EN] Tables' names",
+                    "description": "[FR] Nom des tables ciblées dans le schéma\n[EN] Target tables' names in the schema",
                     "type": "object",
                     "properties": {
                         "detections": {
-                            "description": "Table: Detected photovoltaic installations",
+                            "title": "[FR] Données mesurées\n[EN] Observed data",
+                            "description": "[FR] Nom de table pour les données issues de la télédétection\n[EN] Table name for the data sourced from remote sensing",
                             "type": "string"
                         },
                         "declarations": {
-                            "description": "Table: Declared photovoltaic installations",
+                            "title": "[FR] Données déclarées\n[EN] Declared data",
+                            "description": "[FR] Nom de table pour les données issues des déclarations\n[EN] Table name for the data sourced from declaration",
                             "type": "string"
                         },
                         "links": {
-                            "description": "Table: Links pairing entries from the other tables, when describing a same installation",
+                            "title": "[FR] Paires mesures - déclarations\n[EN] Observations - declarations pairs",
+                            "description": "[FR] Nom de la table de liens entre les données de télédétection et les données déclarées\n[EN] Name of the link table between remote sensing data and declarative data",
                             "type": "string"
                         }
                     },
@@ -81,39 +92,43 @@
             ]
         },
         "to_delete": {
-            "description": "Identifiers of objects to delete from the database",
+            "title": "[FR] Objets à supprimer\n[EN] Objects to delete",
+            "description": "[FR] \n[EN] Identifiers of objects to delete from the database",
             "type": "object",
             "properties": {
                 "declarations": {
-                    "description": "Declarations list",
+                    "title": "[FR] Liste de déclarations à supprimer\n[EN] Declarations removal list",
+                    "description": "[FR] Liste des identifiants en base de données des objets à supprimer de la table des données déclaratives\n[EN] Database identifiers list of objects to delete from declarative data table",
                     "type": "array",
                     "items": {
-                        "description": "declaration's FID",
+                        "title": "[FR] FID de déclaration\n[EN] declaration's FID",
                         "type": "number"
                     },
                     "uniqueItems": true
                 },
                 "detections": {
-                    "description": "Detections list",
+                    "title": "[FR] Liste de détections à supprimer\n[EN] Detections removal list",
+                    "description": "[FR] Liste des identifiants en base de données des objets à supprimer de la table des données de télédétection\n[EN] Database identifiers list of objects to delete from remote sensing data table",
                     "type": "array",
                     "items": {
-                        "description": "detection's FID",
+                        "title": "[FR] FID de détection\n[EN] detection's FID",
                         "type": "number"
                     },
                     "uniqueItems": true
                 },
                 "pairs": {
-                    "description": "Detection-declaration pairs list",
+                    "title": "[FR] Liste de paires détection-déclaration à supprimer\n[EN] Detection-declaration pairs removal list",
+                    "description": "[FR] Liste de paires d'identifiants à supprimer de la table de liens. Chaque paire est formée d'un identifiant de déclaration et d'un identifiant de détection\n[EN] List of database object identifiers pairs to delete from the link table. Each parir contains a declaration's identifier and a detection's identifier",
                     "type": "array",
                     "items": {
                         "type": "object",
                         "properties": {
                             "declaration": {
-                                "description": "declaration's FID",
+                                "title": "[FR] FID de déclaration\n[EN] declaration's FID",
                                 "type": "number"
                             },
                             "detection": {
-                                "description": "detection's FID",
+                                "title": "[FR] FID de détection\n[EN] detection's FID",
                                 "type": "number"
                             }
                         },
