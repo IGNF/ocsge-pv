@@ -99,7 +99,7 @@ jobs:
           coverage html -d target/docs/tests/
           rm target/docs/tests/.gitignore
 
-  docker:
+  docker_image:
     name: Build docker image and push it to github repository
     needs: [create_release, build_and_test]
     outputs:
@@ -147,7 +147,7 @@ jobs:
 
   delete_version:
     name: Remove release and tag if error occured
-    needs: [create_release, build_and_test, build_and_publish_docker]
+    needs: [create_release, build_and_test, docker_image]
     if: ${{ needs.build_and_test.result != 'success' || needs.build_and_publish_docker.result != 'success' }}
     runs-on: ubuntu-latest
 
@@ -164,7 +164,7 @@ jobs:
   documentation:
     name: build and publish documentation
     needs: delete_version
-    if: ${{ needs.build_and_publish_docker.result == 'success' && needs.delete_version.result != 'success' }}
+    if: ${{ needs.docker_image.result == 'success' && needs.delete_version.result != 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Build documentation
