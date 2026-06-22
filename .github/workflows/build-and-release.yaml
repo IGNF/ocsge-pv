@@ -99,31 +99,7 @@ jobs:
           coverage html -d target/docs/tests/
           rm target/docs/tests/.gitignore
 
-      - name: Build documentation
-        if: ${{ matrix.os == 'ubuntu-24.04' && matrix.python-version == '3.12' }}
-        run: |
-          source .venv/bin/activate
-          pip install -e .[doc]
-          mkdocs build
-
-      - name: Upload static files as artifact
-        if: ${{ matrix.os == 'ubuntu-24.04' && matrix.python-version == '3.12' }}
-        id: ghp_deployment
-        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9
-        with:
-          path: public
-
-      - name: Publish documentation
-        if: ${{ matrix.os == 'ubuntu-24.04' && matrix.python-version == '3.12' }}
-        run: |
-          source .venv/bin/activate
-          pip install .[doc] "mike >= 2.2"
-          cd public/
-          mike deploy --push --update-aliases --branch gh-pages -t "Version ${{ github.ref_name }}" ${{ github.ref_name }} latest
-          mike set-default --push --branch gh-pages ${{ github.ref_name }}
-
-
-  build_and_publish_docker:
+  docker:
     name: Build docker image and push it to github repository
     needs: [create_release, build_and_test]
     outputs:
@@ -183,3 +159,30 @@ jobs:
           delete_release: true
           repo: IGNF/ocsge-pv
           github_token: ${{ secrets.GITHUB_TOKEN }}
+
+
+  documentation:
+    name: build and publish documentation
+    needs: delete_version
+    if: ${{ needs.build_and_publish_docker.result == 'success' && needs.delete_version.result != 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build documentation
+        run: |
+          source .venv/bin/activate
+          pip install -e .[doc]
+          mkdocs build
+
+      - name: Upload static files as artifact
+        id: ghp_deployment
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9
+        with:
+          path: public
+
+      - name: Publish documentation
+        run: |
+          source .venv/bin/activate
+          pip install .[doc] "mike >= 2.2"
+          cd public/
+          mike deploy --push --update-aliases --branch gh-pages -t "Version ${{ github.ref_name }}" ${{ github.ref_name }} latest
+          mike set-default --push --branch gh-pages ${{ github.ref_name }}
