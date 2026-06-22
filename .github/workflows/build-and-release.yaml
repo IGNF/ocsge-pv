@@ -46,7 +46,7 @@ jobs:
     outputs:
       job_status: ${{ job.status }}
     strategy:
-      max-parallel: 8
+      max-parallel: 2
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, ubuntu-latest]
@@ -93,28 +93,28 @@ jobs:
           coverage report -m
 
       - name: Build unit tests report
-        if: "! contains(github.ref_name,'b') && matrix.os == 'ubuntu-24.04' && matrix.python-version == '3.12'"
+        if: ${{ matrix.os == 'ubuntu-24.04' && matrix.python-version == '3.12' }}
         run: |
           source .venv/bin/activate
           coverage html -d target/docs/tests/
           rm target/docs/tests/.gitignore
 
       - name: Build documentation
-        if: "matrix.os == 'ubuntu-24.04' && matrix.python-version == '3.12'"
+        if: ${{ matrix.os == 'ubuntu-24.04' && matrix.python-version == '3.12' }}
         run: |
           source .venv/bin/activate
           pip install -e .[doc]
           mkdocs build
 
       - name: Upload static files as artifact
-        if: "matrix.os == 'ubuntu-24.04' && matrix.python-version == '3.12'"
+        if: ${{ matrix.os == 'ubuntu-24.04' && matrix.python-version == '3.12' }}
         id: ghp_deployment
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9
         with:
           path: public
 
       - name: Publish documentation
-        if: "! matrix.os == 'ubuntu-24.04' && matrix.python-version == '3.12'"
+        if: ${{ matrix.os == 'ubuntu-24.04' && matrix.python-version == '3.12' }}
         run: |
           source .venv/bin/activate
           pip install .[doc] "mike >= 2.2"
@@ -125,8 +125,7 @@ jobs:
 
   build_and_publish_docker:
     name: Build docker image and push it to github repository
-    needs: build_and_test
-    if: "always() && needs.create_release.outputs.job_status == 'success' && needs.build_and_test.outputs.job_status == 'success'"
+    needs: [create_release, build_and_test]
     outputs:
       job_status: ${{ job.status }}
     runs-on: ubuntu-latest
@@ -172,8 +171,8 @@ jobs:
 
   delete_version:
     name: Remove release and tag if error occured
-    needs: build_and_publish_docker
-    if: "always() && needs.create_release.outputs.job_status == 'success' && (needs.build_and_test.outputs.job_status != 'success' || needs.build_and_publish_docker.job_status != 'success')"
+    needs: [create_release, build_and_test, build_and_publish_docker]
+    if: ${{ needs.build_and_test.result != 'success' || needs.build_and_publish_docker.result != 'success' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -182,5 +181,5 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           delete_release: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          repo: IGNF/ocsge-pv
+          github_token: ${{ secrets.GITHUB_TOKEN }}
