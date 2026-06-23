@@ -11,6 +11,7 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 permissions:
+  artifact-metadata: write
   attestations: write
   contents: write
   id-token: write
@@ -148,7 +149,7 @@ jobs:
   delete_version:
     name: Remove release and tag if error occured
     needs: [create_release, build_and_test, docker_image]
-    if: ${{ needs.build_and_test.result != 'success' || needs.build_and_publish_docker.result != 'success' }}
+    if: ${{ always() && ( needs.build_and_test.result != 'success' || needs.docker_image.result != 'success' ) }}
     runs-on: ubuntu-latest
 
     steps:
@@ -163,8 +164,8 @@ jobs:
 
   documentation:
     name: build and publish documentation
-    needs: delete_version
-    if: ${{ needs.docker_image.result == 'success' && needs.delete_version.result != 'success' }}
+    needs: [docker_image, delete_version]
+    if: ${{ always() && needs.docker_image.result == 'success' && needs.delete_version.result == 'skipped' }}
     runs-on: ubuntu-latest
     steps:
       - name: Build documentation
