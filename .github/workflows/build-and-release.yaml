@@ -182,6 +182,7 @@ jobs:
 
       - name: Publish documentation
         run: |
+          python3 -m venv .venv
           source .venv/bin/activate
           pip install .[doc] "mike >= 2.2"
           cd public/
