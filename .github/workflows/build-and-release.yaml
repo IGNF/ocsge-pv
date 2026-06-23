@@ -170,6 +170,7 @@ jobs:
     steps:
       - name: Build documentation
         run: |
+          python3 -m venv .venv
           source .venv/bin/activate
           pip install -e .[doc]
           mkdocs build
