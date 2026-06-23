@@ -183,7 +183,7 @@ jobs:
           python3 -m venv .venv
           source .venv/bin/activate
           pip install -e .[doc]
-          mkdocs build
+          mkdocs build -f ./mkdocs.yml
 
       - name: Upload static files as artifact
         id: ghp_deployment
