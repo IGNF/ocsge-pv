@@ -1,0 +1,99 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "pairing_configuration",
+    "title": "[FR] Configuration de l'appariement de données\n[EN] Data pairing configuration",
+    "description": "[FR] Schéma de validation de la configuration pour l'exécutable 'pair_from_sources'\n[EN] Validation schema for the configuration file required by the executable 'pair_from_sources'",
+    "type": "object",
+    "properties": {
+        "main_database": {
+            "title": "[FR] Base de données cible\n[EN] Target database",
+            "description": "[FR] Informations d'accès aux données en entrée/sortie dans leur base de données\n[EN] Connection and navigation information to access the input/output data in their database",
+            "type": "object",
+            "properties": {
+                "host": {
+                    "title": "[FR] Adresse hôte\n[EN] Host address",
+                    "description": "[FR] Adresse URL ou IP de l'hôte BDD\n[EN] DB host's URL or IP address",
+                    "type": "string",
+                    "anyOf": [
+                        {
+                            "format": "hostname"
+                        },
+                        {
+                            "format": "ipv4"
+                        },
+                        {
+                            "format": "ipv6"
+                        }
+                    ]
+                },
+                "port": {
+                    "title": "[FR] Port hôte\n[EN] Host port",
+                    "description": "[FR] Port d'accès à la BDD sur l'hôte\n[EN] DB access port on the host",
+                    "type": "integer"
+                },
+                "name": {
+                    "title": "[FR] Nom de la BDD\n[EN] DB name",
+                    "description": "[FR] Nom de la BDD sur le serveur hôte\n[EN] Database's name on the host server",
+                    "type": "string"
+                },
+                "user": {
+                    "title": "[FR] Nom de l'utilisateur\n[EN] User name",
+                    "description": "[FR] Nom d'utilisateur pour accéder à la BDD\n[EN] User name for DB access",
+                    "type": "string"
+                },
+                "password": {
+                    "title": "[FR] Mot de passe de l'utilisateur\n[EN] User password",
+                    "description": "[FR] Mot de passe pour accéder à la BDD\n[EN] User password for DB access",
+                    "type": "string"
+                },
+                "schema": {
+                    "title": "[FR] Nom du schéma\n[EN] Schema name",
+                    "description": "[FR] Nom du schéma ciblé sur la BDD SQL\n[EN] Target schema name on the SQL BDD",
+                    "type": "string"
+                },
+                "tables": {
+                    "title": "[FR] Nom des tables\n[EN] Tables' names",
+                    "description": "[FR] Nom des tables ciblées dans le schéma\n[EN] Target tables' names in the schema",
+                    "type": "object",
+                    "properties": {
+                        "detections": {
+                            "title": "[FR] Données mesurées\n[EN] Observed data",
+                            "description": "[FR] Nom de table pour les données issues de la télédétection\n[EN] Table name for the data sourced from remote sensing",
+                            "type": "string"
+                        },
+                        "declarations": {
+                            "title": "[FR] Données déclarées\n[EN] Declared data",
+                            "description": "[FR] Nom de table pour les données issues des déclarations\n[EN] Table name for the data sourced from declaration",
+                            "type": "string"
+                        },
+                        "links": {
+                            "title": "[FR] Paires mesures - déclarations\n[EN] Observations - declarations pairs",
+                            "description": "[FR] Nom de la table de liens entre les données de télédétection et les données déclarées\n[EN] Name of the link table between remote sensing data and declarative data",
+                            "type": "string"
+                        }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                        "detections",
+                        "declarations",
+                        "links"
+                    ]
+                }
+            },
+            "additionalProperties": false,
+            "required": [
+                "host",
+                "port",
+                "name",
+                "user",
+                "password",
+                "schema",
+                "tables"
+            ]
+        }
+    },
+    "additionalProperties": false,
+    "required": [
+        "main_database"
+    ]
+}

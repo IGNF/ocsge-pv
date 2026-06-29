@@ -1,0 +1,32 @@
+{
+    "main_database": {
+        "host": "192.168.0.1",
+        "port": 5432,
+        "name": "ocsge",
+        "user": "data_producer",
+        "password": "bip-boop-123456",
+        "schema": "photovoltaic",
+        "tables": {
+            "detections": "detection",
+            "declarations": "declaration",
+            "links": "declaration_detection"
+        }
+    },
+    "to_delete": {
+        "declarations": [
+            298654,
+            326874
+        ],
+        "detections": [
+            1265,
+            1998,
+            17845
+        ],
+        "pairs": [
+            {
+                "declaration": 308463,
+                "detection": 5087
+            }
+        ]
+    }
+}
