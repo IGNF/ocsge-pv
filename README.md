@@ -75,7 +75,7 @@ Les colonnes suivantes sont utilisées pour filtrer l'export de données depuis 
 ### Données de travail et de diffusion
 Voir un de ces deux fichiers :
 * [docs/docker_example/sql_scripts/init-db-paired_data.no_id_generation.sql](./docs/docker_example/sql_scripts/init-db-paired_data.no_id_generation.sql)
-    * Force une valeur automatique lors de l'insertion pour la colonne de clé primaire "pairing.detection.id_millesime" : = (("pairing.detection.id" * 10000000) + "pairing.detection.millesime")
+    * Force une valeur automatique lors de l'insertion pour la colonne de clé primaire "pairing.detection.id_millesime" ( Par concaténation : `<pairing.detection.id> || "-" || <pairing.detection.millesime>`)
     * Il faut donc **ne pas** fournir de valeur pour cette colonne lors des insertions en base.
 * [docs/docker_example/sql_scripts/init-db-paired_data.with_id_generation.sql](./docs/docker_example/sql_scripts/init-db-paired_data.with_id_generation.sql)
     * Ne définit pas de valeur automatique pour la colonne de clé primaire "pairing.detection.id_millesime".
