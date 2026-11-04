@@ -52,7 +52,7 @@ from ocsge_pv.custom_logging import LoggerInterface
 
 NAME = "import_declarations"
 AIOHTTPTransport_logger.setLevel(logging.WARNING)
-logger = LoggerInterface(NAME, "USER", "")
+logger = LoggerInterface(name=NAME)
 ogr.UseExceptions()
 osr.UseExceptions()
 SOURCE_SRID = 4326
@@ -81,7 +81,32 @@ def cli_arg_parser() -> argparse.Namespace:
     )
     parser.add_argument("path", type=Path, help="the path of the configuration file for %(prog)s")
     parser.add_argument(
-        "-v", "--verbose", dest="verbose", action="store_true", help="output more logs"
+        "-v",
+        "--verbose",
+        dest="verbose",
+        action="store_true",
+        help="output more logs (Equivalent to --logging_level=DEBUG)",
+    )
+    parser.add_argument(
+        "--logging_level",
+        choices=["ERROR", "WARNING", "INFO", "DEBUG"],
+        dest="logging_level",
+        default=getenv("OCSGE_PV_LOGGING_LEVEL", None),
+        help="Explicit minmal log level: 'ERROR', 'WARNING', 'INFO' (défaut), 'DEBUG'. (Overrides option -v/--verbose.)",
+    )
+    parser.add_argument(
+        "--a_pfx",
+        "--admin_prefix",
+        dest="admin_prefix",
+        default=getenv("OCSGE_PV_LOGGING_ADMIN_PREFIX", None),
+        help="Desired prefix for restricted (admin level) log messages.",
+    )
+    parser.add_argument(
+        "--u_pfx",
+        "--user_prefix",
+        dest="user_prefix",
+        default=getenv("OCSGE_PV_LOGGING_USER_PREFIX", None),
+        help="Desired prefix for public (unprivileged, user level) log messages.",
     )
     return parser.parse_args()
 
@@ -761,21 +786,29 @@ def main() -> int:
         int: shell exit code of the execution
     """
     try:
-        logger.info("Start of declaration data import.")
+        logger.user_info("Start of declaration data import.")
         cli_args = cli_arg_parser()
-        if cli_args.verbose:
+        if cli_args.logging_level:
+            logger.setLevel(cli_args.logging_level)
+        elif cli_args.verbose:
             logger.setLevel(logging.DEBUG)
-        logger.info("Loading configuration...")
+        else:
+            logger.setLevel(logging.INFO)
+        if cli_args.user_prefix:
+            logger.setUserPrefix(cli_args.user_prefix)
+        if cli_args.admin_prefix:
+            logger.setAdminPrefix(cli_args.admin_prefix)
+        logger.user_info("Loading configuration...")
         configuration = load_configuration(cli_args.path)
-        logger.info("Fetching data...")
+        logger.user_info("Fetching data...")
         input_data = query_source_api(configuration["input"])
         deleted_data = get_deleted_dossier_list(input_data)
-        logger.info("Formating data...")
+        logger.user_info("Formating data...")
         output_data = format_source_result(input_data)
-        logger.info("Writing into database...")
+        logger.user_info("Writing into database...")
         write_output(configuration["output"], output_data)
         mark_as_deleted(configuration["output"], deleted_data)
-        logger.info("End of declaration data import.")
+        logger.user_info("End of declaration data import.")
         return 0
     except Exception:
         logger.error(traceback.format_exc())

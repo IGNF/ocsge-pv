@@ -12,12 +12,10 @@ import logging
 # -- GLOBALS --
 
 NAME = "pair_from_sources"
-TRACE = 5
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(name)s(%(funcName)s) %(prefix)s%(levelname)s: %(message)s",
 )
-logging.addLevelName(TRACE, "TRACE")
 logging.captureWarnings(True)
 
 
@@ -31,25 +29,39 @@ class LoggerInterface:
     Has a trace method shorthand to the custom TRACE log level.
     """
 
-    def __init__(self, name: str, public_prefix: str = "USER", private_prefix: str = ""):
+    def __init__(
+        self,
+        name: str,
+        public_prefix: str = "USER ||",
+        admin_prefix: str = "",
+        level: str | int = "INFO",
+    ):
         """Initialize a logger custom interface instance.
 
         Args:
             name (str): the name passed to the logger
-            public_prefix (str, opt): string prefixed to the log level name
-                in case of public messages (default: "USER")
-                example from default:  "INFO" becomes "USERINFO"
-            private_prefix (str, opt): string prefixed to the log level name
-                in case of private messages (default: "")
-                example from default:  "INFO" remains "INFO"
+            public_prefix (str, opt): public log messages' prefix
+                (default: "USER || ")
+            admin_prefix (str, opt): restricted log messages' prefix
+                (default: "")
+            level (str|int, opt): minimal log level name (default: "INFO")
+                As a string, only accept native level names from "logging"
+
+        Raise:
+            ValueError: level is a string that doesn't match any know log level
         """
+        if isinstance(level, str):
+            level_int_value = logging.getLevelName(level)
+            if not isinstance(level_int_value, int):
+                raise ValueError(f"Unrecognized log level name : '{level}'")
         self.name = name
         self.logger = logging.getLogger(name)
+        self.logger.setLevel(level)
         self.public_prefix = public_prefix
-        self.private_prefix = private_prefix
+        self.admin_prefix = admin_prefix
         self.logger.debug(f"New logger created with name '{self.name}'")
         self.logger.debug(
-            f"Level name will be prefixed by '{self.private_prefix}' "
+            f"Level name will be prefixed by '{self.admin_prefix}' "
             + "for messages targetting privileged users. ('private' messages, default)"
         )
         self.logger.debug(
@@ -57,7 +69,42 @@ class LoggerInterface:
             + "for messages targetting unprivileged users. ('public' messages)"
         )
 
-    def log(self, level: int, msg: str, public: bool = False, *args, **kwargs):
+    def setLevel(self, level: str) -> None:
+        """Set minimal logging level.
+
+        Args:
+            level (str|int, opt): minimal log level name (default: "INFO")
+                As a string, only accept native level names from "logging"
+
+        Raise:
+            ValueError: level is a string that doesn't match any know log level
+        """
+        if isinstance(level, str):
+            level_int_value = logging.getLevelName(level)
+            if not isinstance(level_int_value, int):
+                raise ValueError(f"Unrecognized log level name : '{level}'")
+        self.logger.setLevel(level)
+        self.admin_info(f"Minimal logging level set to {self.logger.level}")
+
+    def setPublicPrefix(self, prefix: str) -> None:
+        """Set public log messages' prefix
+
+        Args:
+            prefix (str): public log messages' prefix
+        """
+        self.public_prefix = prefix
+        self.admin_debug(f"Public messages' prefix set to '{self.public_prefix}'")
+
+    def setAdminPrefix(self, prefix: str) -> None:
+        """Set restricted log messages' prefix
+
+        Args:
+            prefix (str): restricted log messages' prefix
+        """
+        self.admin_prefix = prefix
+        self.admin_debug(f"Restricted messages' prefix set to '{self.admin_prefix}'")
+
+    def log(self, level: int, msg: str, public: bool = False, *args, **kwargs) -> None:
         """Calls logging.Logger.log() with the modified level name.
 
         Aside from 'public', the arguments are those for logging.Logger.log()
@@ -69,19 +116,16 @@ class LoggerInterface:
             *args: other logging.Logger.log() positional arguments reference
             **kwargs: other logging.Logger.log() keyword arguments reference
         """
-        if kwargs is None:
-            kwargs = {}
         if public:
-            kwargs["extra"] = {"prefix": self.public_prefix}
+            new_msg = f"{self.public_prefix}{msg}"
         else:
-            kwargs["extra"] = {"prefix": self.public_prefix}
+            new_msg = f"{self.admin_prefix}{msg}"
         self.logger.log(level, msg, *args, **kwargs)
 
-    def debug(self, msg: str, public: bool = False, *args, **kwargs):
+    def debug(self, msg: str, public: bool = False, *args, **kwargs) -> None:
         """Shorthand to LoggerInterface.log(logging.DEBUG, ...).
 
         Args:
-            level (int): logging level
             msg (str): message to log
             public (bool, opt): is the message public ? (default: False)
             *args: other logging.Logger.log() positional arguments reference
@@ -89,11 +133,30 @@ class LoggerInterface:
         """
         self.log(logging.DEBUG, msg, public, *args, **kwargs)
 
-    def info(self, msg: str, public: bool = False, *args, **kwargs):
+    def user_debug(self, msg: str, *args, **kwargs) -> None:
+        """Send a public DEBUG message
+
+        Args:
+            msg (str): message to log
+            *args: other logging.Logger.log() positional arguments reference
+            **kwargs: other logging.Logger.log() keyword arguments reference
+        """
+        self.debug(msg=msg, public=True, *args, **kwargs)
+
+    def admin_debug(self, msg: str, *args, **kwargs) -> None:
+        """Send a restricted DEBUG message
+
+        Args:
+            msg (str): message to log
+            *args: other logging.Logger.log() positional arguments reference
+            **kwargs: other logging.Logger.log() keyword arguments reference
+        """
+        self.debug(msg=msg, public=False, *args, **kwargs)
+
+    def info(self, msg: str, public: bool = False, *args, **kwargs) -> None:
         """Shorthand to LoggerInterface.log(logging.INFO, ...).
 
         Args:
-            level (int): logging level
             msg (str): message to log
             public (bool, opt): is the message public ? (default: False)
             *args: other logging.Logger.log() positional arguments reference
@@ -101,11 +164,30 @@ class LoggerInterface:
         """
         self.log(logging.INFO, msg, public, *args, **kwargs)
 
-    def warning(self, msg: str, public: bool = False, *args, **kwargs):
+    def user_info(self, msg: str, *args, **kwargs) -> None:
+        """Send a public INFO message
+
+        Args:
+            msg (str): message to log
+            *args: other logging.Logger.log() positional arguments reference
+            **kwargs: other logging.Logger.log() keyword arguments reference
+        """
+        self.info(msg=msg, public=True, *args, **kwargs)
+
+    def admin_info(self, msg: str, *args, **kwargs) -> None:
+        """Send a restricted INFO message
+
+        Args:
+            msg (str): message to log
+            *args: other logging.Logger.log() positional arguments reference
+            **kwargs: other logging.Logger.log() keyword arguments reference
+        """
+        self.info(msg=msg, public=False, *args, **kwargs)
+
+    def warning(self, msg: str, public: bool = False, *args, **kwargs) -> None:
         """Shorthand to LoggerInterface.log(logging.WARNING, ...).
 
         Args:
-            level (int): logging level
             msg (str): message to log
             public (bool, opt): is the message public ? (default: False)
             *args: other logging.Logger.log() positional arguments reference
@@ -113,11 +195,30 @@ class LoggerInterface:
         """
         self.log(logging.WARNING, msg, public, *args, **kwargs)
 
-    def error(self, msg: str, public: bool = False, *args, **kwargs):
+    def user_warning(self, msg: str, *args, **kwargs) -> None:
+        """Send a public WARNING message
+
+        Args:
+            msg (str): message to log
+            *args: other logging.Logger.log() positional arguments reference
+            **kwargs: other logging.Logger.log() keyword arguments reference
+        """
+        self.warning(msg=msg, public=True, *args, **kwargs)
+
+    def admin_warning(self, msg: str, *args, **kwargs) -> None:
+        """Send a restricted WARNING message
+
+        Args:
+            msg (str): message to log
+            *args: other logging.Logger.log() positional arguments reference
+            **kwargs: other logging.Logger.log() keyword arguments reference
+        """
+        self.warning(msg=msg, public=False, *args, **kwargs)
+
+    def error(self, msg: str, public: bool = False, *args, **kwargs) -> None:
         """Shorthand to LoggerInterface.log(logging.ERROR, ...).
 
         Args:
-            level (int): logging level
             msg (str): message to log
             public (bool, opt): is the message public ? (default: False)
             *args: other logging.Logger.log() positional arguments reference
@@ -125,11 +226,30 @@ class LoggerInterface:
         """
         self.log(logging.ERROR, msg, public, *args, **kwargs)
 
-    def critical(self, msg: str, public: bool = False, *args, **kwargs):
+    def user_error(self, msg: str, *args, **kwargs) -> None:
+        """Send a public ERROR message
+
+        Args:
+            msg (str): message to log
+            *args: other logging.Logger.log() positional arguments reference
+            **kwargs: other logging.Logger.log() keyword arguments reference
+        """
+        self.error(msg=msg, public=True, *args, **kwargs)
+
+    def admin_error(self, msg: str, *args, **kwargs) -> None:
+        """Send a restricted ERROR message
+
+        Args:
+            msg (str): message to log
+            *args: other logging.Logger.log() positional arguments reference
+            **kwargs: other logging.Logger.log() keyword arguments reference
+        """
+        self.error(msg=msg, public=False, *args, **kwargs)
+
+    def critical(self, msg: str, public: bool = False, *args, **kwargs) -> None:
         """Shorthand to LoggerInterface.log(logging.CRITICAL, ...).
 
         Args:
-            level (int): logging level
             msg (str): message to log
             public (bool, opt): is the message public ? (default: False)
             *args: other logging.Logger.log() positional arguments reference
@@ -137,15 +257,22 @@ class LoggerInterface:
         """
         self.log(logging.CRITICAL, msg, public, *args, **kwargs)
 
-    # Custom level
-    def trace(self, msg: str, public: bool = False, *args, **kwargs):
-        """Shorthand to LoggerInterface.log(TRACE, ...).
+    def user_critical(self, msg: str, *args, **kwargs) -> None:
+        """Send a public CRITICAL message
 
         Args:
-            level (int): logging level
             msg (str): message to log
-            public (bool, opt): is the message public ? (default: False)
             *args: other logging.Logger.log() positional arguments reference
             **kwargs: other logging.Logger.log() keyword arguments reference
         """
-        self.log(logging.TRACE, msg, public, *args, **kwargs)
+        self.critical(msg=msg, public=True, *args, **kwargs)
+
+    def admin_critical(self, msg: str, *args, **kwargs) -> None:
+        """Send a restricted CRITICAL message
+
+        Args:
+            msg (str): message to log
+            *args: other logging.Logger.log() positional arguments reference
+            **kwargs: other logging.Logger.log() keyword arguments reference
+        """
+        self.critical(msg=msg, public=False, *args, **kwargs)
