@@ -35,6 +35,7 @@ import sys
 import traceback
 from copy import deepcopy
 from datetime import date, datetime
+from os import getenv
 from pathlib import Path
 
 import jsonschema
@@ -66,11 +67,10 @@ SOURCE_SRS.ImportFromEPSG(SOURCE_SRID)  # Axes order: (latitude, longitude)
 def cli_arg_parser() -> argparse.Namespace:
     """Parse CLI arguments
 
-    Args:
-        * sys.argv (implicit) - CLI arguments
+    Extract execution parameters from sys.argv
 
     Returns:
-        argparse.Namespace: processed arguments
+        Processed arguments
     """
     parser = argparse.ArgumentParser(
         prog=NAME,
@@ -115,10 +115,10 @@ def format_feature(in_data: dict) -> dict:
     """Transform declaration dossier to postgis feature
 
     Args:
-        in_data (Dict): dossier's data for a single declaration
+        in_data: dossier's data for a single declaration
 
     Returns:
-        Dict: structure to insert in the output database
+        Structure to insert in the output database
     """
     out_data = {
         "id_dossier": None,
@@ -413,10 +413,10 @@ def format_source_result(data: list[dict]) -> list[dict]:
     """Transform input data to output data
 
     Args:
-        data (List[Dict]): raw data as returned by query_source_api
+        data: raw data as returned by query_source_api
 
     Returns:
-        List[Dict]: features list with the target SQL table structure
+        Features list with the target SQL table structure
     """
     feature_list = []
     id_list = []
@@ -438,10 +438,10 @@ def get_deleted_dossier_list(data: list[dict]) -> set:
     """Extract deleted dossiers from input data
 
     Args:
-        data (List[Dict]): raw data as returned by query_source_api
+        data: raw data as returned by query_source_api
 
     Returns:
-        set: deleted dossiers id set
+        Deleted dossiers id set
     """
     id_set = set()
     for page in data["demarche"]["deletedDossiers"]:
@@ -454,14 +454,14 @@ def load_configuration(path: Path) -> dict:
     """Returns validated configuration from file
 
     Args:
-        path (str): path to the configuration file
+        path: path to the configuration file
 
     Raises:
         jonschema.ValidationError: The configuration file does
             not match the validation schema
 
     Returns:
-        Dict: the configuration object translated from the input file
+        The configuration object translated from the input file
     """
     try:
         resource_dir = os.environ.get("OCSGE_PV_RESOURCE_DIR")
@@ -510,8 +510,8 @@ def mark_as_deleted(output_conf: dict, data: set) -> None:
     """Write declarations to database
 
     Args:
-        output_conf (Dict): configuration used to access the database
-        data (set): set of deleted dossiers id
+        output_conf: configuration used to access the database
+        data: set of deleted dossiers id
     """
     with psycopg.connect(output_conf["_pg_string"], autocommit=True) as conn:
         cur = conn.cursor()
@@ -551,10 +551,10 @@ def query_source_api(input_conf: dict) -> list[dict]:
     """Read input data from the source GraphQL API
 
     Args:
-        input_conf (Dict): configuration used to access the API
+        input_conf: configuration used to access the API
 
     Returns:
-        List[Dict]: The converted input data structured almost like
+        The converted input data structured almost like
             the original full response model, but with the properties
             "demarche"."dossiers" and "demarche"."deletedDossiers"
             expressed as lists of pages.
@@ -643,8 +643,8 @@ def write_output(output_conf: dict, data: list) -> None:
     """Write declarations to database
 
     Args:
-        output_conf (Dict): configuration used to access the database
-        data (List): list of output data to insert
+        output_conf: configuration used to access the database
+        data: list of output data to insert
     """
     keys_list = None
     line_writing_mode = None
@@ -778,12 +778,11 @@ def write_output(output_conf: dict, data: list) -> None:
 def main() -> int:
     """Main routine, entrypoint for the program
 
-    Args:
-        path (str): path to the configuration file
-            (implicit, contained in sys.argv[])
+    No argument. Those are extracted from the CLI.
+    See cli_arg_parser().
 
     Returns:
-        int: shell exit code of the execution
+        Shell exit code of the execution
     """
     try:
         logger.user_info("Start of declaration data import.")

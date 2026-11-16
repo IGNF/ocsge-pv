@@ -61,21 +61,16 @@ osr.UseExceptions()
 def cli_arg_parser() -> argparse.Namespace:
     """Parse CLI arguments
 
-    Args:
-        * sys.argv (implicit) - CLI arguments
+    Extract execution parameters from sys.argv
 
     Returns:
         argparse.Namespace: processed arguments
     """
     parser = argparse.ArgumentParser(
         prog=NAME,
-        description=(
-            "Establishes links between declaration data and remote detection data"
-        ),
+        description=("Establishes links between declaration data and remote detection data"),
     )
-    parser.add_argument(
-        "path", type=Path, help="the path of the configuration file for %(prog)s"
-    )
+    parser.add_argument("path", type=Path, help="the path of the configuration file for %(prog)s")
     parser.add_argument(
         "-v", "--verbose", dest="verbose", action="store_true", help="output more logs"
     )
@@ -95,8 +90,8 @@ def delete_before_matching(output_conf: dict, id_set: set[dict]) -> None:
     Delete the targeted declarations and their associated pairs
 
     Args:
-        output_conf (dict): output database information
-        id_set (set[int]): set of targeted declarations' identifiers
+        output_conf: output database information
+        id_set: set of targeted declarations' identifiers
     """
     try:
         delete_data.delete_declarations(output_conf, id_set)
@@ -108,8 +103,8 @@ def delete_after_matching(output_conf: dict, link_set: set[tuple]) -> None:
     """Delete older conflicting pairs from the link table
 
     Args:
-        output_conf (dict): output database information
-        link_set (set[tuple]): set of pairs to delete, in the form
+        output_conf: output database information
+        link_set: set of pairs to delete, in the form
             (declaration_id: int, detection_id: int)
     """
     deleted_pairs_count = 0
@@ -130,8 +125,8 @@ def insert_new(output_conf: dict, link_set: set[tuple]) -> None:
     """Insert new pairs in the link table
 
     Args:
-        output_conf (dict): output database information
-        link_set (set[tuple]): set of pairs to insert, in the form
+        output_conf: output database information
+        link_set: set of pairs to insert, in the form
             (declaration_id: int, detection_id: int)
     """
     new_pairs_count = 0
@@ -166,14 +161,14 @@ def load_configuration(path: Path) -> dict:
     """Returns validated configuration from file
 
     Args:
-        path (str): path to the configuration file
+        path: path to the configuration file
 
     Raises:
         jonschema.ValidationError: The configuration file does not
             match the validation schema
 
     Returns:
-        Dict: the configuration object translated from the input file
+        The configuration object translated from the input file
     """
     try:
         resource_dir = os.environ.get("OCSGE_PV_RESOURCE_DIR")
@@ -218,10 +213,10 @@ def check_declared_parcels(data_layer: ogr.Layer) -> set[int]:
     marked for deletion.
 
     Args:
-        data_layer (ogr.Layer): declarations data layer
+        data_layer: declarations data layer
 
     Returns:
-        set: id sequence for declarations to delete
+        id sequence for declarations to delete
     """
     # Create the set of id to delete
     deletion_set = set()
@@ -246,9 +241,7 @@ def check_declared_parcels(data_layer: ogr.Layer) -> set[int]:
                     parcels_dict[parcel_idu] = {}
                 if feature_year not in parcels_dict[parcel_idu]:
                     parcels_dict[parcel_idu][feature_year] = {}
-                parcels_dict[parcel_idu][feature_year][
-                    feature_creation_date
-                ] = feature_id
+                parcels_dict[parcel_idu][feature_year][feature_creation_date] = feature_id
     # Fill the set of id to delete
     for idu in list(parcels_dict):
         for year in list(parcels_dict[idu]):
@@ -275,7 +268,9 @@ def check_declared_parcels(data_layer: ogr.Layer) -> set[int]:
     del_list = list(deletion_set)
     logger.warning(f"Declarations deletion list = {del_list} (Count: {len(del_list)})")
     for fid in del_list:
-        message = f"Declaration dossier {fid} will be deleted. (Cause·s: {str(deletion_cause_dict[fid])})"
+        message = (
+            f"Declaration dossier {fid} will be deleted. (Cause·s: {str(deletion_cause_dict[fid])})"
+        )
         logger.warning(message)
     return deletion_set
 
@@ -290,15 +285,15 @@ def match_dec_to_det(
     """Declarations VS detections matching function
 
     Args:
-        dec_layer (ogr.Layer): declarations OGR layer
-        det_layer (ogr.Layer): detections OGR layer
-        link_layer (ogr.Layer): pairings OGR layer
-        transform (osr.CoordinateTransformation): OSR coordinates
-            transformation from declaration to detection
-        need_swap (bool): axis swapping need in this transformation
+        dec_layer: declarations OGR layer
+        det_layer: detections OGR layer
+        link_layer: pairings OGR layer
+        transform: OSR coordinates transformation
+            from declaration to detection
+        need_swap: axis swapping need in this transformation
 
     Returns:
-        dict: pairs to create or delete
+        Pairs to create or delete
             {
                 "new": set(
                     (declaration_fid: int, detection_fid: int),
@@ -362,10 +357,7 @@ def match_dec_to_det(
                 linked_dec_dict[dec_fid] = {
                     "creation": creation_dt,
                 }
-            if (
-                latest_fid is None
-                or linked_dec_dict[latest_fid]["creation"] < creation_dt
-            ):
+            if latest_fid is None or linked_dec_dict[latest_fid]["creation"] < creation_dt:
                 latest_fid = dec_fid
         # Decide if found link will be created, deleted, or ignored
         for dec_fid in list(linked_dec_dict):
@@ -409,12 +401,11 @@ def match_dec_to_det(
 def main() -> int:
     """Main routine, entrypoint for the program
 
-    Args:
-        path (str): path to the configuration file
-            (implicit, contained in sys.argv[])
+    No argument. Those are extracted from the CLI.
+    See cli_arg_parser().
 
     Returns:
-        int: shell exit code of the execution
+        Shell exit code of the execution
     """
     try:
         logger.info("Start of declarations' pairing with detections.")
@@ -426,18 +417,14 @@ def main() -> int:
         elif cli_args.verbose:
             logger.setLevel(logging.DEBUG)
             log_level_description = "verbose"
-        logger.info(
-            f"Logging level: '{logger.getEffectiveLevel()}' ({log_level_description})"
-        )
+        logger.info(f"Logging level: '{logger.getEffectiveLevel()}' ({log_level_description})")
         # Read configuration
         logger.info("Loading configuration...")
         configuration = load_configuration(cli_args.path)
         # OGR layers and spatial references
         logger.info("Preparing OGR entities...")
         latlon_sr_name_list = ["WGS 84"]
-        ogr_pg_connection = ogr.Open(
-            "PG: " + configuration["main_database"]["_pg_string"]
-        )
+        ogr_pg_connection = ogr.Open("PG: " + configuration["main_database"]["_pg_string"])
         ## Declarations layer
         declaration_table = ".".join(
             (
@@ -506,13 +493,11 @@ def main() -> int:
             coordinates_transformation = osr.CoordinateTransformation(
                 declaration_osr_sr, detection_osr_sr
             )
-            need_coordinates_swap = (
-                is_detection_sr_latlon and not is_declaration_sr_latlon
-            ) or (is_declaration_sr_latlon and not is_detection_sr_latlon)
+            need_coordinates_swap = (is_detection_sr_latlon and not is_declaration_sr_latlon) or (
+                is_declaration_sr_latlon and not is_detection_sr_latlon
+            )
             if need_coordinates_swap:
-                logger.debug(
-                    "Axis order swapping is necessary for this transformation."
-                )
+                logger.debug("Axis order swapping is necessary for this transformation.")
         # Check for duplicates in declarations
         logger.info("Checking for conflicting declarations...")
         dupe_dec_set = check_declared_parcels(declaration_ogr_layer)

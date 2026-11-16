@@ -47,23 +47,18 @@ logger = logging.getLogger(NAME)
 def cli_arg_parser() -> argparse.Namespace:
     """Parse CLI arguments
 
-    Args:
-        * sys.argv (implicit) - CLI arguments
+    Extract execution parameters from sys.argv
 
     Returns:
-        argparse.Namespace: processed arguments
+        Processed arguments
     """
     parser = argparse.ArgumentParser(
         prog=NAME,
         description=("Deletes photovoltaic data objects from database"),
     )
-    parser.add_argument(
-        "path", type=Path, help="the path of the configuration file for %(prog)s"
-    )
+    parser.add_argument("path", type=Path, help="the path of the configuration file for %(prog)s")
     parser.add_argument("--detections", help="Comma separated list of detections' ids")
-    parser.add_argument(
-        "--declarations", help="Comma separated list of declarations' ids"
-    )
+    parser.add_argument("--declarations", help="Comma separated list of declarations' ids")
     parser.add_argument(
         "--pairs",
         help="Comma separated list of id pairs. Each pair has the form '<detection_id>-<declaration_id>'",
@@ -78,14 +73,14 @@ def load_configuration(path: Path) -> dict:
     """Returns validated configuration from file
 
     Args:
-        path (str): path to the configuration file
+        path: path to the configuration file
 
     Raises:
         jonschema.ValidationError: The configuration file does not
             match the validation schema
 
     Returns:
-        Dict: the configuration object translated from the input file
+        The configuration object translated from the input file
     """
     try:
         resource_dir = os.environ.get("OCSGE_PV_RESOURCE_DIR")
@@ -100,9 +95,7 @@ def load_configuration(path: Path) -> dict:
         schema = json.loads(schema_str)
         jsonschema.validate(source_configuration, schema)
         modified_configuration = {}
-        modified_configuration["main_database"] = deepcopy(
-            source_configuration["main_database"]
-        )
+        modified_configuration["main_database"] = deepcopy(source_configuration["main_database"])
         modified_configuration["main_database"]["_pg_string"] = (
             "host="
             + modified_configuration["main_database"]["host"]
@@ -136,10 +129,7 @@ def load_configuration(path: Path) -> dict:
                 source_configuration["to_delete"]["detections"]
             )
             modified_configuration["to_delete"]["detections"].sort()
-        if (
-            "to_delete" in source_configuration
-            and "pairs" in source_configuration["to_delete"]
-        ):
+        if "to_delete" in source_configuration and "pairs" in source_configuration["to_delete"]:
             modified_configuration["to_delete"]["pairs"] = deepcopy(
                 source_configuration["to_delete"]["pairs"]
             )
@@ -153,13 +143,13 @@ def get_ids_from_cli(arguments: argparse.Namespace) -> dict:
     """Get ids lists froom configuration object and CLI arguments
 
     Args:
-        arguments (argparse.Namespace): result from cli_arg_parser()
+        arguments: result from cli_arg_parser()
 
     Raises:
         Exception: unidentified error
 
     Returns:
-        dict: extracted ids, same format as in the configuration
+        Extracted ids, same format as in the configuration
             {
                 "declarations": list[int],
                 "detections": list[int],
@@ -211,15 +201,13 @@ def combine_id_inventories(conf_inventory: dict, cli_inventory: dict) -> dict:
     """Combine inventories from configuration and CLI arguments.
 
     Args:
-        conf_inventory (dict): ids inventory from configuration
-        cli_inventory (dict): ids inventory from CLI arguments
+        conf_inventory: ids inventory from configuration
+        cli_inventory: ids inventory from CLI arguments
 
     Returns:
-        dict: combined deletions' ids inventory
+        Combined deletions' ids inventory
     """
-    logger.info(
-        f"Deletions inventory from configuration file: {json.dumps(conf_inventory)}"
-    )
+    logger.info(f"Deletions inventory from configuration file: {json.dumps(conf_inventory)}")
     logger.info(f"deletions inventory from CLI arguments: {json.dumps(cli_inventory)}")
     dec_set = set(conf_inventory["declarations"])
     det_set = set(conf_inventory["detections"])
@@ -250,11 +238,11 @@ def delete_declarations(db_info: dict, declarations: set) -> None:
     """Delete declarations and associated pairs
 
     Args:
-        db_info (dict): database connection and table information
-        declarations (set): target declarations ids list
+        db_info: database connection and table information
+        declarations: target declarations ids list
 
     Raises:
-        Exception: unidentified error, mostly in databse interactions
+        Exception: unidentified error, mostly in database interactions
     """
     logger.info("Deleting declarations and associated pairs")
     deleted_declarations_count = 0
@@ -267,16 +255,12 @@ def delete_declarations(db_info: dict, declarations: set) -> None:
                 cur = conn.cursor()
                 with conn.transaction():
                     cur.execute(
-                        sql.SQL(
-                            "DELETE FROM {table} WHERE declaration_id IN ({id_list})"
-                        ).format(
+                        sql.SQL("DELETE FROM {table} WHERE declaration_id IN ({id_list})").format(
                             table=sql.Identifier(
                                 db_info["schema"],
                                 db_info["tables"]["links"],
                             ),
-                            id_list=sql.SQL(", ").join(
-                                sql.Placeholder() * len(declarations)
-                            ),
+                            id_list=sql.SQL(", ").join(sql.Placeholder() * len(declarations)),
                         ),
                         tuple(declarations),
                     )
@@ -286,16 +270,12 @@ def delete_declarations(db_info: dict, declarations: set) -> None:
                     deleted_pairs_count = int(count_str)
 
                     cur.execute(
-                        sql.SQL(
-                            "DELETE FROM {table} WHERE id_dossier IN ({id_list})"
-                        ).format(
+                        sql.SQL("DELETE FROM {table} WHERE id_dossier IN ({id_list})").format(
                             table=sql.Identifier(
                                 db_info["schema"],
                                 db_info["tables"]["declarations"],
                             ),
-                            id_list=sql.SQL(", ").join(
-                                sql.Placeholder() * len(declarations)
-                            ),
+                            id_list=sql.SQL(", ").join(sql.Placeholder() * len(declarations)),
                         ),
                         tuple(declarations),
                     )
@@ -316,11 +296,11 @@ def delete_detections(db_info: dict, detections: set) -> None:
     """Delete detections and associated pairs
 
     Args:
-        db_info (dict): database connection and table information
-        detections (set): target detections ids list
+        db_info: database connection and table information
+        detections: target detections ids list
 
     Raises:
-        Exception: unidentified error, mostly in databse interactions
+        Exception: unidentified error, mostly in database interactions
     """
     logger.info("Deleting detections and associated pairs")
     deleted_detections_count = 0
@@ -333,16 +313,12 @@ def delete_detections(db_info: dict, detections: set) -> None:
                 cur = conn.cursor()
                 with conn.transaction():
                     cur.execute(
-                        sql.SQL(
-                            "DELETE FROM {table} WHERE detection_id IN ({id_list})"
-                        ).format(
+                        sql.SQL("DELETE FROM {table} WHERE detection_id IN ({id_list})").format(
                             table=sql.Identifier(
                                 db_info["schema"],
                                 db_info["tables"]["links"],
                             ),
-                            id_list=sql.SQL(", ").join(
-                                sql.Placeholder() * len(detections)
-                            ),
+                            id_list=sql.SQL(", ").join(sql.Placeholder() * len(detections)),
                         ),
                         tuple(detections),
                     )
@@ -352,16 +328,12 @@ def delete_detections(db_info: dict, detections: set) -> None:
                     deleted_pairs_count = int(count_str)
 
                     cur.execute(
-                        sql.SQL(
-                            "DELETE FROM {table} WHERE id_v2 IN ({id_list})"
-                        ).format(
+                        sql.SQL("DELETE FROM {table} WHERE id_v2 IN ({id_list})").format(
                             table=sql.Identifier(
                                 db_info["schema"],
                                 db_info["tables"]["detections"],
                             ),
-                            id_list=sql.SQL(", ").join(
-                                sql.Placeholder() * len(detections)
-                            ),
+                            id_list=sql.SQL(", ").join(sql.Placeholder() * len(detections)),
                         ),
                         tuple(detections),
                     )
@@ -373,20 +345,18 @@ def delete_detections(db_info: dict, detections: set) -> None:
                 logger.error(traceback.format_exc())
                 conn.rollback()
                 raise exc
-    logger.info(
-        f"{deleted_detections_count} detections and {deleted_pairs_count} pairs deleted."
-    )
+    logger.info(f"{deleted_detections_count} detections and {deleted_pairs_count} pairs deleted.")
 
 
 def delete_pairs(db_info: dict, pairs: list) -> None:
     """Delete pairs
 
     Args:
-        db_info (dict): database connection and table information
-        pairs (list): target id pairs list
+        db_info: database connection and table information
+        pairs: target id pairs list
 
     Raises:
-        Exception: unidentified error, mostly in databse interactions
+        Exception: unidentified error, mostly in database interactions
     """
     logger.info("Deleting explicit pairs")
     deleted_pairs_count = 0
@@ -429,12 +399,11 @@ def delete_pairs(db_info: dict, pairs: list) -> None:
 def main() -> int:
     """Main routine, entrypoint for the program
 
-    Args:
-        path (str): path to the configuration file
-            (implicit, contained in sys.argv[])
+    No argument. Those are extracted from the CLI.
+    See cli_arg_parser().
 
     Returns:
-        int: shell exit code of the execution
+        Shell exit code of the execution
     """
     try:
         logger.info("Start of discrete data deletion.")
@@ -443,9 +412,7 @@ def main() -> int:
         if cli_args.verbose:
             logger.setLevel(logging.DEBUG)
             log_level_description = "verbose"
-        logger.info(
-            f"Logging level: '{logger.getEffectiveLevel()}' ({log_level_description})"
-        )
+        logger.info(f"Logging level: '{logger.getEffectiveLevel()}' ({log_level_description})")
         # Read configuration
         logger.info("Loading configuration...")
         configuration = load_configuration(cli_args.path)

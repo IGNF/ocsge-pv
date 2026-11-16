@@ -100,7 +100,7 @@
                     "title": "[FR] Nom du schéma\n[EN] Schema name",
                     "description": "[FR] Nom du schéma de destination sur la BDD SQL\n[EN] Destination schema name on the SQL BDD",
                     "type": "string",
-                    "examples": ["photovoltaic"]
+                    "examples": ["raw_import"]
                 },
                 "table": {
                     "title": "[FR] Nom de la table\n[EN] Table name",

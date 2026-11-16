@@ -5,7 +5,7 @@
         "name": "ocsge",
         "user": "data_producer",
         "password": "bip-boop-123456",
-        "schema": "photovoltaic",
+        "schema": "pairing",
         "tables": {
             "detections": "detection",
             "declarations": "declaration",

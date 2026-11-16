@@ -5,7 +5,7 @@
         "name": "ocsge",
         "user": "data_producer",
         "password": "bip-boop-123456",
-        "schema": "photovoltaic",
+        "schema": "raw_import",
         "table": "declaration",
         "_pg_string": "host=192.168.0.1 port=5432 dbname=ocsge user=data_producer password=bip-boop-123456"
     },

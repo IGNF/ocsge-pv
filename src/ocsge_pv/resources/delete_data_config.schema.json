@@ -49,7 +49,8 @@
                 "schema": {
                     "title": "[FR] Nom du schéma\n[EN] Schema name",
                     "description": "[FR] Nom du schéma ciblé sur la BDD SQL\n[EN] Target schema name on the SQL BDD",
-                    "type": "string"
+                    "type": "string",
+                    "examples": ["pairing"]
                 },
                 "tables": {
                     "title": "[FR] Nom des tables\n[EN] Tables' names",
@@ -59,17 +60,20 @@
                         "detections": {
                             "title": "[FR] Données mesurées\n[EN] Observed data",
                             "description": "[FR] Nom de table pour les données issues de la télédétection\n[EN] Table name for the data sourced from remote sensing",
-                            "type": "string"
+                            "type": "string",
+                            "examples": ["detection"]
                         },
                         "declarations": {
                             "title": "[FR] Données déclarées\n[EN] Declared data",
                             "description": "[FR] Nom de table pour les données issues des déclarations\n[EN] Table name for the data sourced from declaration",
-                            "type": "string"
+                            "type": "string",
+                            "examples": ["declaration"]
                         },
                         "links": {
                             "title": "[FR] Paires mesures - déclarations\n[EN] Observations - declarations pairs",
                             "description": "[FR] Nom de la table de liens entre les données de télédétection et les données déclarées\n[EN] Name of the link table between remote sensing data and declarative data",
-                            "type": "string"
+                            "type": "string",
+                            "examples": ["declaration_detection"]
                         }
                     },
                     "additionalProperties": false,
