@@ -19,6 +19,10 @@ This file contains the following functions :
     * main - main function of the script
 """
 
+# -- IMPORTS
+
+
+## from stdlib
 import argparse
 import json
 import logging
@@ -26,11 +30,19 @@ import os
 import re
 import traceback
 from copy import deepcopy
+from os import getenv
 from pathlib import Path
 
+## third party
 import jsonschema
 import psycopg
 from psycopg import sql
+
+# from current project
+from ocsge_pv.custom_logging import LoggerInterface
+
+# -- GLOBALS --
+
 
 NAME = "delete_data"
 logging.basicConfig(
@@ -38,7 +50,9 @@ logging.basicConfig(
     format="%(asctime)s %(name)s(%(funcName)s) %(levelname)s: %(message)s",
 )
 logging.captureWarnings(True)
-logger = logging.getLogger(NAME)
+_base_logger = logging.getLogger(name=NAME)
+_user_logger = LoggerInterface(_base_logger, "USER || ")
+_admin_logger = LoggerInterface(_base_logger, "")
 
 
 # -- FUNCTIONS --
@@ -64,7 +78,32 @@ def cli_arg_parser() -> argparse.Namespace:
         help="Comma separated list of id pairs. Each pair has the form '<detection_id>-<declaration_id>'",
     )
     parser.add_argument(
-        "-v", "--verbose", dest="verbose", action="store_true", help="output more logs"
+        "-v",
+        "--verbose",
+        dest="verbose",
+        action="store_true",
+        help="Output more logs (Equivalent to --logging_level=DEBUG)",
+    )
+    parser.add_argument(
+        "--logging_level",
+        choices=["ERROR", "WARNING", "INFO", "DEBUG"],
+        dest="logging_level",
+        default=getenv("OCSGE_PV_LOGGING_LEVEL", None),
+        help="Explicit minimal log level: 'ERROR', 'WARNING', 'INFO' (default), 'DEBUG'. (Overrides option -v/--verbose.)",
+    )
+    parser.add_argument(
+        "--a_pfx",
+        "--admin_prefix",
+        dest="admin_prefix",
+        default=getenv("OCSGE_PV_LOGGING_ADMIN_PREFIX", None),
+        help="Desired prefix for restricted (admin level) log messages. Defaults to no prefix.",
+    )
+    parser.add_argument(
+        "--u_pfx",
+        "--user_prefix",
+        dest="user_prefix",
+        default=getenv("OCSGE_PV_LOGGING_USER_PREFIX", None),
+        help="Desired prefix for public (unprivileged, user level) log messages. Defaults to 'USER || '.",
     )
     return parser.parse_args()
 
@@ -135,7 +174,8 @@ def load_configuration(path: Path) -> dict:
             )
         return modified_configuration
     except Exception as exc:
-        logger.error(traceback.format_exc())
+        _admin_logger.error(traceback.format_exc())
+        _user_logger.error(f"Failed loading configuration '{path}'")
         raise exc
 
 
@@ -184,7 +224,8 @@ def get_ids_from_cli(arguments: argparse.Namespace) -> dict:
                 det_list.append(int(detection_str))
             det_list.sort()
     except Exception as exc:
-        logger.error(traceback.format_exc())
+        _user_logger.error(traceback.format_exc())
+        _user_logger.error("Failed getting ids list from CLI arguments.")
         raise exc
     extracted_dict = {
         "declarations": dec_list,
@@ -207,8 +248,8 @@ def combine_id_inventories(conf_inventory: dict, cli_inventory: dict) -> dict:
     Returns:
         Combined deletions' ids inventory
     """
-    logger.info(f"Deletions inventory from configuration file: {json.dumps(conf_inventory)}")
-    logger.info(f"deletions inventory from CLI arguments: {json.dumps(cli_inventory)}")
+    _user_logger.info(f"Deletions inventory from configuration file: {json.dumps(conf_inventory)}")
+    _user_logger.info(f"Deletions inventory from CLI arguments: {json.dumps(cli_inventory)}")
     dec_set = set(conf_inventory["declarations"])
     det_set = set(conf_inventory["detections"])
     pairs_list = deepcopy(conf_inventory["pairs"])
@@ -244,11 +285,11 @@ def delete_declarations(db_info: dict, declarations: set) -> None:
     Raises:
         Exception: unidentified error, mostly in database interactions
     """
-    logger.info("Deleting declarations and associated pairs")
+    _user_logger.info("Deleting declarations and associated pairs")
     deleted_declarations_count = 0
     deleted_pairs_count = 0
     if not declarations:
-        logger.info("No declaration to delete.")
+        _user_logger.info("No declaration to delete.")
     else:
         with psycopg.connect(db_info["_pg_string"]) as conn:
             try:
@@ -284,10 +325,11 @@ def delete_declarations(db_info: dict, declarations: set) -> None:
                     count_str = count_match.group(1)
                     deleted_declarations_count = int(count_str)
             except Exception as exc:
-                logger.error(traceback.format_exc())
+                _admin_logger.error(traceback.format_exc())
+                _user_logger.error("Failed deleting declarations and associated pairs.")
                 conn.rollback()
                 raise exc
-    logger.info(
+    _user_logger.info(
         f"{deleted_declarations_count} declarations and {deleted_pairs_count} pairs deleted."
     )
 
@@ -302,11 +344,11 @@ def delete_detections(db_info: dict, detections: set) -> None:
     Raises:
         Exception: unidentified error, mostly in database interactions
     """
-    logger.info("Deleting detections and associated pairs")
+    _user_logger.info("Deleting detections and associated pairs")
     deleted_detections_count = 0
     deleted_pairs_count = 0
     if not detections:
-        logger.info("No detection to delete.")
+        _user_logger.info("No detection to delete.")
     else:
         with psycopg.connect(db_info["_pg_string"]) as conn:
             try:
@@ -342,10 +384,13 @@ def delete_detections(db_info: dict, detections: set) -> None:
                     count_str = count_match.group(1)
                     deleted_detections_count = int(count_str)
             except Exception as exc:
-                logger.error(traceback.format_exc())
+                _admin_logger.error(traceback.format_exc())
+                _user_logger.error("Failed deleting detections and associated pairs.")
                 conn.rollback()
                 raise exc
-    logger.info(f"{deleted_detections_count} detections and {deleted_pairs_count} pairs deleted.")
+    _user_logger.info(
+        f"{deleted_detections_count} detections and {deleted_pairs_count} pairs deleted."
+    )
 
 
 def delete_pairs(db_info: dict, pairs: list) -> None:
@@ -358,10 +403,10 @@ def delete_pairs(db_info: dict, pairs: list) -> None:
     Raises:
         Exception: unidentified error, mostly in database interactions
     """
-    logger.info("Deleting explicit pairs")
+    _user_logger.info("Deleting explicit pairs")
     deleted_pairs_count = 0
     if not pairs:
-        logger.info("No pair to delete.")
+        _user_logger.info("No pair to delete.")
     else:
         with psycopg.connect(db_info["_pg_string"]) as conn:
             try:
@@ -387,10 +432,11 @@ def delete_pairs(db_info: dict, pairs: list) -> None:
                         count_str = count_match.group(1)
                         deleted_pairs_count += int(count_str)
             except Exception as exc:
-                logger.error(traceback.format_exc())
+                _admin_logger.error(traceback.format_exc())
+                _user_logger.error("Failed deleting explicit pairs.")
                 conn.rollback()
                 raise exc
-    logger.info(f"{deleted_pairs_count} pairs deleted.")
+    _user_logger.info(f"{deleted_pairs_count} pairs deleted.")
 
 
 # -- MAIN FUNCTION --
@@ -406,31 +452,38 @@ def main() -> int:
         Shell exit code of the execution
     """
     try:
-        logger.info("Start of discrete data deletion.")
+        _user_logger.info("Start of discrete data deletion.")
         cli_args = cli_arg_parser()
-        log_level_description = "normal"
-        if cli_args.verbose:
-            logger.setLevel(logging.DEBUG)
-            log_level_description = "verbose"
-        logger.info(f"Logging level: '{logger.getEffectiveLevel()}' ({log_level_description})")
+        # Configure logging
+        if cli_args.admin_prefix is not None:
+            _admin_logger.set_prefix(cli_args.admin_prefix)
+        if cli_args.user_prefix is not None:
+            _user_logger.set_prefix(cli_args.user_prefix)
+        if cli_args.logging_level:
+            _base_logger.setLevel(cli_args.logging_level)
+        elif cli_args.verbose:
+            _base_logger.setLevel(logging.DEBUG)
+        else:
+            _base_logger.setLevel(logging.INFO)
         # Read configuration
-        logger.info("Loading configuration...")
+        _user_logger.info("Loading configuration...")
         configuration = load_configuration(cli_args.path)
         # Compute deletion ids lists
         # Note that deleting a declaration or a detection will also delete all related pairs
-        logger.info("Computing initial deletions lists...")
+        _user_logger.info("Computing initial deletions lists...")
         cli_id_dict = get_ids_from_cli(cli_args)
         inventory = combine_id_inventories(configuration["to_delete"], cli_id_dict)
         # Realise the deletions from the database
-        logger.info("Deleting elements from database...")
+        _user_logger.info("Deleting elements from database...")
         delete_declarations(configuration["main_database"], inventory["declarations"])
         delete_detections(configuration["main_database"], inventory["detections"])
         delete_pairs(configuration["main_database"], inventory["pairs"])
         # Finished
-        logger.info("End of discrete data deletion.")
+        _user_logger.info("End of discrete data deletion.")
         return 0
     except Exception:
-        logger.error(traceback.format_exc())
+        _admin_logger.error(traceback.format_exc())
+        _user_logger.error("Failed deleting data.")
         return 1
 
 
