@@ -69,6 +69,8 @@ class TestConfigurationValidationSchema(TestCase):
 class TestConfigurationLoader(TestCase):
     """Tests the configuration loader."""
 
+    maxDiff = None
+
     def setUp(self):
         self.env_copy = deepcopy(os.environ)
         self.env_copy["OCSGE_PV_RESOURCE_DIR"] = str(OCSGE_PV_RESOURCE_DIR)

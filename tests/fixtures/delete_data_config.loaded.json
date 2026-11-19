@@ -19,14 +19,14 @@
             326874
         ],
         "detections": [
-            1265,
-            1998,
-            17845
+            "2018SURFACTI0000002200338431",
+            "2018SURFACTI0000002200338598",
+            "2019SURFACTI0000002200338431"
         ],
         "pairs": [
             {
                 "declaration": 308463,
-                "detection": 5087
+                "detection": "2019SURFACTI0000002200338598"
             }
         ]
     }

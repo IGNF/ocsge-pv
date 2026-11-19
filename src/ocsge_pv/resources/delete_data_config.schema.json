@@ -115,8 +115,8 @@
                     "description": "[FR] Liste des identifiants en base de données des objets à supprimer de la table des données de télédétection\n[EN] Database identifiers list of objects to delete from remote sensing data table",
                     "type": "array",
                     "items": {
-                        "title": "[FR] FID de détection\n[EN] detection's FID",
-                        "type": "number"
+                        "title": "[FR] ID unique de détection\n[EN] detection's unique ID",
+                        "type": "string"
                     },
                     "uniqueItems": true
                 },
@@ -132,8 +132,8 @@
                                 "type": "number"
                             },
                             "detection": {
-                                "title": "[FR] FID de détection\n[EN] detection's FID",
-                                "type": "number"
+                                "title": "[FR] ID unique de détection\n[EN] detection's unique ID",
+                                "type": "string"
                             }
                         },
                         "additionalProperties": false,

@@ -338,20 +338,23 @@ def match_dec_to_det(
     del_cause_dict = {}
     ignored_old_links_count = 0
     ignored_new_links_count = 0
+    det_uid_index = None
     for det_feature in det_layer:
         linked_dec_dict = {}
         old_linked_dec_set = set()
-        det_fid = det_feature.GetFID()
+        if det_uid_index is None:
+            det_uid_index = det_feature.GetFieldIndex("id_millesime")
+        det_uid = det_feature.GetFieldAsString(det_uid_index)
         det_geom = det_feature.GetGeometryRef().Clone()
         if det_geom is None or det_geom.IsEmpty():
-            raise ValueError(f"Detection '{det_fid}' has a empty or null geometry.")
+            raise ValueError(f"Detection '{det_uid}' has a empty or null geometry.")
         # Check for existing links with this detection
-        link_layer.SetAttributeFilter(f"detection_id = {det_fid}")
+        link_layer.SetAttributeFilter(f"detection_id = '{det_uid}'")
         for link_feature in link_layer:
             dec_fid = link_feature.GetField("declaration_id")
             dec_feature = dec_layer.GetFeature(dec_fid)
             if dec_feature is None:
-                link_tuple = (dec_fid, det_fid)
+                link_tuple = (dec_fid, det_uid)
                 result["del"].add(link_tuple)
                 if str(link_tuple) not in del_cause_dict:
                     del_cause_dict[str(link_tuple)] = set()
@@ -391,13 +394,13 @@ def match_dec_to_det(
         # Decide if found link will be created, deleted, or ignored
         for dec_fid in list(linked_dec_dict):
             # (declaration_fid, detection_fid) tuple
-            link_tuple = (dec_fid, det_fid)
+            link_tuple = (dec_fid, det_uid)
             if dec_fid != latest_fid and dec_fid in old_linked_dec_set:
                 # Duplicate existing link: mark for deletion
                 result["del"].add(link_tuple)
                 if str(link_tuple) not in del_cause_dict:
                     del_cause_dict[str(link_tuple)] = set()
-                cause = f"Duplicate link for detection {det_fid}"
+                cause = f"Duplicate link for detection {det_uid}"
                 del_cause_dict[str(link_tuple)].add(cause)
             elif dec_fid == latest_fid and dec_fid not in old_linked_dec_set:
                 # New link: mark for creation

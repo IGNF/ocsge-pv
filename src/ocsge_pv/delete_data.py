@@ -192,11 +192,11 @@ def get_ids_from_cli(arguments: argparse.Namespace) -> dict:
         Extracted ids, same format as in the configuration
             {
                 "declarations": list[int],
-                "detections": list[int],
+                "detections": list[str],
                 "pairs": [
                     {
                         "declaration": int,
-                        "detection": int,
+                        "detection": str,
                     },
                     ...
                 ],
@@ -210,7 +210,7 @@ def get_ids_from_cli(arguments: argparse.Namespace) -> dict:
             for pair_str in arguments.pairs.split(","):
                 pair_split = pair_str.split("-")
                 pair_obj = {
-                    "detection": int(pair_split[0]),
+                    "detection": str(pair_split[0]),
                     "declaration": int(pair_split[1]),
                 }
                 if pair_obj not in pair_list:
@@ -221,7 +221,7 @@ def get_ids_from_cli(arguments: argparse.Namespace) -> dict:
             dec_list.sort()
         if arguments.detections is not None:
             for detection_str in arguments.detections.split(","):
-                det_list.append(int(detection_str))
+                det_list.append(str(detection_str))
             det_list.sort()
     except Exception as exc:
         _user_logger.error(traceback.format_exc())

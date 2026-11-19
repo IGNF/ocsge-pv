@@ -37,7 +37,7 @@ class LoggerInterface(logging.LoggerAdapter):
 
         Overrides super().process(msg, kwargs)
         """
-        new_msg = f"{self.extra["prefix"]}{msg}"
+        new_msg = f"{self.extra['prefix']}{msg}"
         return new_msg, kwargs
 
     def set_prefix(self, prefix: str) -> None:
