@@ -200,5 +200,6 @@ jobs:
           source .venv/bin/activate
           pip install .[doc] "mike >= 2.2"
           cd public/
+          git fetch --no-tags --prune --depth=1 origin +refs/heads/gh-pages:refs/remotes/origin/gh-pages
           mike deploy --config-file ../mkdocs.yml --push --update-aliases --branch gh-pages -t "Version ${{ github.ref_name }}" ${{ github.ref_name }} latest
           mike set-default --config-file ../mkdocs.yml --push --branch gh-pages ${{ github.ref_name }}
