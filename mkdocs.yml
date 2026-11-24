@@ -1,0 +1,34 @@
+site_name: Traitement multisources de données OSCGE sur le parc photovoltaïque français
+site_dir: public
+
+theme: material
+
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
+plugins:
+  - mkdocstrings:
+      default_handler: python
+      locale: en
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_source: true
+  - extrafiles:
+      files:
+        - src: LICENSE.md
+          dest: external/LICENSE.md
+        - src: src/ocsge_pv/resources/**
+          dest: external/resources/
+        - src: tests/fixtures/delete_data_config.ok_**.json
+          dest: external/fixtures/
+
+nav:
+  - Accueil (FR): index.md
+  - Guide d'utilisation (FR only): usage_guide/index.md
+  - Developer guide (EN only): code_doc/index.md
+  - Licence / License (EN): external/LICENSE.md

@@ -11,12 +11,13 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 permissions:
+  artifact-metadata: write
   attestations: write
   contents: write
   id-token: write
   packages: write
   pages: write
-  pull-requests: write
+  pull-requests: read
 
 jobs:
   create_release:
@@ -27,11 +28,11 @@ jobs:
       job_status: ${{ job.status }}
     steps:
       - name: Checkout project
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # = @v7.0.1
 
       - name: Create Release
         id: create_release
-        uses: ncipollo/release-action@440c8c1cb0ed28b9f43e4d1d670870f059653174
+        uses: ncipollo/release-action@339a81892b84b4eeb0f6e744e4574d79d0d9b8dd # = @v1.21.0
         with:
           tag: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
@@ -49,20 +50,20 @@ jobs:
       max-parallel: 2
       fail-fast: false
       matrix:
+        os: [ubuntu-24.04]
+        python-version: ["3.12", "3.13", "3.14"]
         include:
-          - os: ubuntu-24.04
-            python-version: "3.12"
           - os: ubuntu-22.04
-            python-version: "3.10"
+            python-version: "3.11"
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout project
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # = @v7.0.1
         with:
           fetch-depth: 0
 
       - name: Setup python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # = @v7.1.0
         with:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
@@ -71,7 +72,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt update
-          sudo apt -y install python3-gdal libgdal-dev
+          sudo apt -y install python3-gdal libgdal-dev g++
 
       - name: Install python dependencies
         run: |
@@ -91,43 +92,24 @@ jobs:
           coverage report -m
 
       - name: Build unit tests report
-        if: "! contains(github.ref_name,'b') && matrix.os == 'ubuntu-24.04' && matrix.python-version == '3.12'"
+        if: ${{ matrix.os == 'ubuntu-24.04' && matrix.python-version == '3.12' }}
         run: |
           source .venv/bin/activate
           coverage html -d target/docs/tests/
           rm target/docs/tests/.gitignore
 
-      - name: Build documentation
-        if: "! contains(github.ref_name,'b') && matrix.os == 'ubuntu-24.04' && matrix.python-version == '3.12'"
-        run: |
-          source .venv/bin/activate
-          pip install -e .[doc]
-          pdoc -d google -o target/docs/ ocsge_pv
-
-      - name: Publish documentation
-        if: "! contains(github.ref_name,'b') && matrix.os == 'ubuntu-24.04' && matrix.python-version == '3.12'"
-        run: |
-          source .venv/bin/activate
-          pip install -r docs/requirements.txt
-          git config user.name github-actions
-          git config user.email github-actions@github.com
-          cd target/
-          mike deploy --push --update-aliases --branch gh-pages -t "Version ${{ github.ref_name }}" ${{ github.ref_name }} latest
-          mike set-default --push --branch gh-pages ${{ github.ref_name }}
-
-  build_and_publish_docker:
+  docker_image:
     name: Build docker image and push it to github repository
-    needs: build_and_test
-    if: "always() && needs.create_release.outputs.job_status == 'success' && needs.build_and_test.outputs.job_status == 'success'"
+    needs: [create_release, build_and_test]
     outputs:
       job_status: ${{ job.status }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout project
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # = @v7.0.1
+
       - name: Log in to GitHub Container Repository
-        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # = @v4.8.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -135,7 +117,7 @@ jobs:
 
       - name: Prepare Docker metadata
         id: docker_mtd
-        uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # = @v6.2.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           labels:
@@ -143,19 +125,19 @@ jobs:
             org.opencontainers.image.base.name=docker.io/library/ubuntu:24.04
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # = @v4.4.1
 
       - name: Build and push Docker image
         id: docker_push
-        uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # = @v7.4.0
         with:
           context: .
           push: true
           tags: ${{ steps.docker_mtd.outputs.tags }}
           labels: ${{ steps.docker_mtd.outputs.labels }}
-      
+
       - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # = @v4.2.2
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}
           subject-digest: ${{ steps.docker_push.outputs.digest }}
@@ -164,15 +146,60 @@ jobs:
 
   delete_version:
     name: Remove release and tag if error occured
-    needs: build_and_test
-    if: "always() && needs.create_release.outputs.job_status == 'success' && needs.build_and_test.outputs.job_status != 'success'"
+    needs: [create_release, build_and_test, docker_image]
+    if: ${{ always() && ( needs.build_and_test.result != 'success' || needs.docker_image.result != 'success' ) }}
     runs-on: ubuntu-latest
 
     steps:
       - name: Remove release and tag
-        uses: dev-drprasad/delete-tag-and-release@v1.1
+        uses: dev-drprasad/delete-tag-and-release@82600feb9527126eca69833f07bafe53279bd9b4 # = @v1.1
         with:
           tag_name: ${{ github.ref_name }}
           delete_release: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          repo: IGNF/ocsge-pv
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+
+  documentation:
+    name: build and publish documentation
+    needs: [docker_image, delete_version]
+    if: ${{ always() && needs.docker_image.result == 'success' && needs.delete_version.result == 'skipped' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # = @v7.0.1
+
+      - name: Setup Git User
+        run: |
+          git config --local user.name "GitHub Actions [Bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Setup python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # = @v7.1.0
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: '**/pyproject.toml'
+
+      - name: Build documentation
+        run: |
+          python3 -m venv .venv
+          source .venv/bin/activate
+          pip install -e .[doc]
+          mkdocs build -f ./mkdocs.yml
+
+      - name: Upload static files as artifact
+        id: ghp_deployment
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # = @v5.0.0
+        with:
+          path: public
+
+      - name: Publish documentation
+        run: |
+          python3 -m venv .venv
+          source .venv/bin/activate
+          pip install .[doc] "mike >= 2.2"
+          cd public/
+          git fetch --no-tags --prune --depth=1 origin +refs/heads/gh-pages:refs/remotes/origin/gh-pages
+          mike deploy --config-file ../mkdocs.yml --push --update-aliases --branch gh-pages -t "Version ${{ github.ref_name }}" ${{ github.ref_name }} latest
+          mike set-default --config-file ../mkdocs.yml --push --branch gh-pages ${{ github.ref_name }}

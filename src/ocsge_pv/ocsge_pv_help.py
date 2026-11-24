@@ -19,8 +19,10 @@ from ocsge_pv.pair_from_sources import cli_arg_parser as pair_from_sources_cli
 def main() -> int:
     """Main routine, entrypoint for the program
 
+    Prints the help messages from all other executables, then exit.
+
     Returns:
-        int: shell exit code of the execution
+        Shell exit code of the execution
     """
     original_sys_argv = sys.argv
     try:

@@ -21,8 +21,10 @@ This file contains the following functions :
     * main - main function of the script
 """
 
-# -- IMPORTS --
+# -- IMPORTS
 
+
+## from stdlib
 import argparse
 import json
 import logging
@@ -31,26 +33,31 @@ import sys
 import traceback
 from copy import deepcopy
 from datetime import datetime
+from os import getenv
 from pathlib import Path
 
+## third party
 import jsonschema
 import psycopg
 from osgeo import ogr, osr
 from psycopg import sql
 
+# from current project
 from ocsge_pv import delete_data
+from ocsge_pv.custom_logging import LoggerInterface
 
 # -- GLOBALS --
 
+
 NAME = "pair_from_sources"
-TRACE = 5
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(name)s(%(funcName)s) %(levelname)s: %(message)s",
 )
-logging.addLevelName(TRACE, "TRACE")
 logging.captureWarnings(True)
-logger = logging.getLogger(NAME)
+_base_logger = logging.getLogger(name=NAME)
+_user_logger = LoggerInterface(_base_logger, "USER || ")
+_admin_logger = LoggerInterface(_base_logger, "")
 ogr.UseExceptions()
 osr.UseExceptions()
 
@@ -61,30 +68,43 @@ osr.UseExceptions()
 def cli_arg_parser() -> argparse.Namespace:
     """Parse CLI arguments
 
-    Args:
-        * sys.argv (implicit) - CLI arguments
+    Extract execution parameters from sys.argv
 
     Returns:
         argparse.Namespace: processed arguments
     """
     parser = argparse.ArgumentParser(
         prog=NAME,
-        description=(
-            "Establishes links between declaration data and remote detection data"
-        ),
+        description=("Establishes links between declaration data and remote detection data"),
     )
+    parser.add_argument("path", type=Path, help="the path of the configuration file for %(prog)s")
     parser.add_argument(
-        "path", type=Path, help="the path of the configuration file for %(prog)s"
-    )
-    parser.add_argument(
-        "-v", "--verbose", dest="verbose", action="store_true", help="output more logs"
-    )
-    parser.add_argument(
-        "-vv",
-        "--very_verbose",
-        dest="very_verbose",
+        "-v",
+        "--verbose",
+        dest="verbose",
         action="store_true",
-        help="output even more logs",
+        help="Output more logs (Equivalent to --logging_level=DEBUG)",
+    )
+    parser.add_argument(
+        "--logging_level",
+        choices=["ERROR", "WARNING", "INFO", "DEBUG"],
+        dest="logging_level",
+        default=getenv("OCSGE_PV_LOGGING_LEVEL", None),
+        help="Explicit minimal log level: 'ERROR', 'WARNING', 'INFO' (default), 'DEBUG'. (Overrides option -v/--verbose.)",
+    )
+    parser.add_argument(
+        "--a_pfx",
+        "--admin_prefix",
+        dest="admin_prefix",
+        default=getenv("OCSGE_PV_LOGGING_ADMIN_PREFIX", None),
+        help="Desired prefix for restricted (admin level) log messages. Defaults to no prefix.",
+    )
+    parser.add_argument(
+        "--u_pfx",
+        "--user_prefix",
+        dest="user_prefix",
+        default=getenv("OCSGE_PV_LOGGING_USER_PREFIX", None),
+        help="Desired prefix for public (unprivileged, user level) log messages. Defaults to 'USER || '.",
     )
     return parser.parse_args()
 
@@ -95,12 +115,13 @@ def delete_before_matching(output_conf: dict, id_set: set[dict]) -> None:
     Delete the targeted declarations and their associated pairs
 
     Args:
-        output_conf (dict): output database information
-        id_set (set[int]): set of targeted declarations' identifiers
+        output_conf: output database information
+        id_set: set of targeted declarations' identifiers
     """
     try:
         delete_data.delete_declarations(output_conf, id_set)
     except Exception as exc:
+        _user_logger.error(f"Failed deleting the following declarations: {id_set}")
         raise exc
 
 
@@ -108,8 +129,8 @@ def delete_after_matching(output_conf: dict, link_set: set[tuple]) -> None:
     """Delete older conflicting pairs from the link table
 
     Args:
-        output_conf (dict): output database information
-        link_set (set[tuple]): set of pairs to delete, in the form
+        output_conf: output database information
+        link_set: set of pairs to delete, in the form
             (declaration_id: int, detection_id: int)
     """
     deleted_pairs_count = 0
@@ -123,6 +144,7 @@ def delete_after_matching(output_conf: dict, link_set: set[tuple]) -> None:
     try:
         delete_data.delete_pairs(output_conf, pairs_list)
     except Exception as exc:
+        _user_logger.error(f"Failed deleting the following pairs: {link_set}")
         raise exc
 
 
@@ -130,8 +152,8 @@ def insert_new(output_conf: dict, link_set: set[tuple]) -> None:
     """Insert new pairs in the link table
 
     Args:
-        output_conf (dict): output database information
-        link_set (set[tuple]): set of pairs to insert, in the form
+        output_conf: output database information
+        link_set: set of pairs to insert, in the form
             (declaration_id: int, detection_id: int)
     """
     new_pairs_count = 0
@@ -140,7 +162,7 @@ def insert_new(output_conf: dict, link_set: set[tuple]) -> None:
         try:
             with conn.transaction():
                 for link_tuple in link_set:
-                    logger.log(TRACE, f"Inserting pair {link_tuple}.")
+                    _user_logger.debug(f"Inserting pair {link_tuple}.")
                     cur.execute(
                         sql.SQL(
                             "INSERT INTO {table} ({dec_key}, {det_key}) VALUES (%s, %s)"
@@ -156,24 +178,25 @@ def insert_new(output_conf: dict, link_set: set[tuple]) -> None:
                     )
                     new_pairs_count += 1
         except Exception as exc:
-            logger.error(traceback.format_exc())
+            _admin_logger.error(traceback.format_exc())
+            _user_logger.error(f"Error while inserting pair {link_tuple}.")
             conn.rollback()
             raise exc
-    logger.debug(f"{new_pairs_count} new pairs inserted in database.")
+    _user_logger.debug(f"{new_pairs_count} new pairs inserted in database.")
 
 
 def load_configuration(path: Path) -> dict:
     """Returns validated configuration from file
 
     Args:
-        path (str): path to the configuration file
+        path: path to the configuration file
 
     Raises:
         jonschema.ValidationError: The configuration file does not
             match the validation schema
 
     Returns:
-        Dict: the configuration object translated from the input file
+        The configuration object translated from the input file
     """
     try:
         resource_dir = os.environ.get("OCSGE_PV_RESOURCE_DIR")
@@ -202,7 +225,8 @@ def load_configuration(path: Path) -> dict:
         )
         return modified_configuration
     except Exception as exc:
-        logger.error(traceback.format_exc())
+        _admin_logger.error(traceback.format_exc())
+        _user_logger.error(f"Failed loading configuration '{path}'.")
         raise exc
 
 
@@ -218,10 +242,10 @@ def check_declared_parcels(data_layer: ogr.Layer) -> set[int]:
     marked for deletion.
 
     Args:
-        data_layer (ogr.Layer): declarations data layer
+        data_layer: declarations data layer
 
     Returns:
-        set: id sequence for declarations to delete
+        id sequence for declarations to delete
     """
     # Create the set of id to delete
     deletion_set = set()
@@ -246,9 +270,7 @@ def check_declared_parcels(data_layer: ogr.Layer) -> set[int]:
                     parcels_dict[parcel_idu] = {}
                 if feature_year not in parcels_dict[parcel_idu]:
                     parcels_dict[parcel_idu][feature_year] = {}
-                parcels_dict[parcel_idu][feature_year][
-                    feature_creation_date
-                ] = feature_id
+                parcels_dict[parcel_idu][feature_year][feature_creation_date] = feature_id
     # Fill the set of id to delete
     for idu in list(parcels_dict):
         for year in list(parcels_dict[idu]):
@@ -273,10 +295,12 @@ def check_declared_parcels(data_layer: ogr.Layer) -> set[int]:
                     )
                     deletion_cause_dict[detection_id].add(cause)
     del_list = list(deletion_set)
-    logger.warning(f"Declarations deletion list = {del_list} (Count: {len(del_list)})")
+    _user_logger.warning(f"Declarations deletion list = {del_list} (Count: {len(del_list)})")
     for fid in del_list:
-        message = f"Declaration dossier {fid} will be deleted. (Cause·s: {str(deletion_cause_dict[fid])})"
-        logger.warning(message)
+        message = (
+            f"Declaration dossier {fid} will be deleted. (Cause·s: {str(deletion_cause_dict[fid])})"
+        )
+        _user_logger.warning(message)
     return deletion_set
 
 
@@ -290,15 +314,15 @@ def match_dec_to_det(
     """Declarations VS detections matching function
 
     Args:
-        dec_layer (ogr.Layer): declarations OGR layer
-        det_layer (ogr.Layer): detections OGR layer
-        link_layer (ogr.Layer): pairings OGR layer
-        transform (osr.CoordinateTransformation): OSR coordinates
-            transformation from declaration to detection
-        need_swap (bool): axis swapping need in this transformation
+        dec_layer: declarations OGR layer
+        det_layer: detections OGR layer
+        link_layer: pairings OGR layer
+        transform: OSR coordinates transformation
+            from declaration to detection
+        need_swap: axis swapping need in this transformation
 
     Returns:
-        dict: pairs to create or delete
+        Pairs to create or delete
             {
                 "new": set(
                     (declaration_fid: int, detection_fid: int),
@@ -314,20 +338,23 @@ def match_dec_to_det(
     del_cause_dict = {}
     ignored_old_links_count = 0
     ignored_new_links_count = 0
+    det_uid_index = None
     for det_feature in det_layer:
         linked_dec_dict = {}
         old_linked_dec_set = set()
-        det_fid = det_feature.GetFID()
+        if det_uid_index is None:
+            det_uid_index = det_feature.GetFieldIndex("id_millesime")
+        det_uid = det_feature.GetFieldAsString(det_uid_index)
         det_geom = det_feature.GetGeometryRef().Clone()
         if det_geom is None or det_geom.IsEmpty():
-            raise ValueError(f"Detection '{det_fid}' has a empty or null geometry.")
+            raise ValueError(f"Detection '{det_uid}' has a empty or null geometry.")
         # Check for existing links with this detection
-        link_layer.SetAttributeFilter(f"detection_id = {det_fid}")
+        link_layer.SetAttributeFilter(f"detection_id = '{det_uid}'")
         for link_feature in link_layer:
             dec_fid = link_feature.GetField("declaration_id")
             dec_feature = dec_layer.GetFeature(dec_fid)
             if dec_feature is None:
-                link_tuple = (dec_fid, det_fid)
+                link_tuple = (dec_fid, det_uid)
                 result["del"].add(link_tuple)
                 if str(link_tuple) not in del_cause_dict:
                     del_cause_dict[str(link_tuple)] = set()
@@ -362,21 +389,18 @@ def match_dec_to_det(
                 linked_dec_dict[dec_fid] = {
                     "creation": creation_dt,
                 }
-            if (
-                latest_fid is None
-                or linked_dec_dict[latest_fid]["creation"] < creation_dt
-            ):
+            if latest_fid is None or linked_dec_dict[latest_fid]["creation"] < creation_dt:
                 latest_fid = dec_fid
         # Decide if found link will be created, deleted, or ignored
         for dec_fid in list(linked_dec_dict):
             # (declaration_fid, detection_fid) tuple
-            link_tuple = (dec_fid, det_fid)
+            link_tuple = (dec_fid, det_uid)
             if dec_fid != latest_fid and dec_fid in old_linked_dec_set:
                 # Duplicate existing link: mark for deletion
                 result["del"].add(link_tuple)
                 if str(link_tuple) not in del_cause_dict:
                     del_cause_dict[str(link_tuple)] = set()
-                cause = f"Duplicate link for detection {det_fid}"
+                cause = f"Duplicate link for detection {det_uid}"
                 del_cause_dict[str(link_tuple)].add(cause)
             elif dec_fid == latest_fid and dec_fid not in old_linked_dec_set:
                 # New link: mark for creation
@@ -389,17 +413,17 @@ def match_dec_to_det(
                 ignored_old_links_count += 1
         link_layer.SetAttributeFilter(None)
     del_list = list(result["del"])
-    logger.warning(f"Links deletion list: {del_list} (Count: {len(del_list)})")
-    logger.debug(f"Count of new links to add: {len(result['new'])}")
-    logger.debug(f"Count of ignored new links: {ignored_new_links_count}")
-    logger.debug(f"Count of kept old links: {ignored_old_links_count}")
+    _user_logger.warning(f"Links deletion list: {del_list} (Count: {len(del_list)})")
+    _user_logger.debug(f"Count of new links to add: {len(result['new'])}")
+    _user_logger.debug(f"Count of ignored new links: {ignored_new_links_count}")
+    _user_logger.debug(f"Count of kept old links: {ignored_old_links_count}")
     for link_tuple in del_list:
         message = (
             f"Link between declaration {link_tuple[0]} "
             + f"and detection {link_tuple[1]} will be deleted "
             + f"(Cause·s: {del_cause_dict[str(link_tuple)]})"
         )
-        logger.warning(message)
+        _user_logger.warning(message)
     return result
 
 
@@ -409,35 +433,33 @@ def match_dec_to_det(
 def main() -> int:
     """Main routine, entrypoint for the program
 
-    Args:
-        path (str): path to the configuration file
-            (implicit, contained in sys.argv[])
+    No argument. Those are extracted from the CLI.
+    See cli_arg_parser().
 
     Returns:
-        int: shell exit code of the execution
+        Shell exit code of the execution
     """
     try:
-        logger.info("Start of declarations' pairing with detections.")
+        _user_logger.info("Start of declarations' pairing with detections.")
         cli_args = cli_arg_parser()
-        log_level_description = "normal"
-        if cli_args.very_verbose:
-            logger.setLevel(logging.getLevelName("TRACE"))
-            log_level_description = "very verbose"
+        # Configure logging
+        if cli_args.admin_prefix is not None:
+            _admin_logger.set_prefix(cli_args.admin_prefix)
+        if cli_args.user_prefix is not None:
+            _user_logger.set_prefix(cli_args.user_prefix)
+        if cli_args.logging_level:
+            _base_logger.setLevel(cli_args.logging_level)
         elif cli_args.verbose:
-            logger.setLevel(logging.DEBUG)
-            log_level_description = "verbose"
-        logger.info(
-            f"Logging level: '{logger.getEffectiveLevel()}' ({log_level_description})"
-        )
+            _base_logger.setLevel(logging.DEBUG)
+        else:
+            _base_logger.setLevel(logging.INFO)
         # Read configuration
-        logger.info("Loading configuration...")
+        _user_logger.info("Loading configuration...")
         configuration = load_configuration(cli_args.path)
         # OGR layers and spatial references
-        logger.info("Preparing OGR entities...")
+        _user_logger.info("Preparing OGR entities...")
         latlon_sr_name_list = ["WGS 84"]
-        ogr_pg_connection = ogr.Open(
-            "PG: " + configuration["main_database"]["_pg_string"]
-        )
+        ogr_pg_connection = ogr.Open("PG: " + configuration["main_database"]["_pg_string"])
         ## Declarations layer
         declaration_table = ".".join(
             (
@@ -448,9 +470,8 @@ def main() -> int:
         declaration_ogr_layer = ogr_pg_connection.GetLayerByName(declaration_table)
         if declaration_ogr_layer is None:
             raise Exception(f"Declaration layer '{declaration_table}' was not loaded.")
-        logger.log(
-            TRACE,
-            f"FID column for declaration layer: '{declaration_ogr_layer.GetFIDColumn()}'",
+        _user_logger.debug(
+            f"FID column for declaration layer: '{declaration_ogr_layer.GetFIDColumn()}'"
         )
         declaration_osr_sr = declaration_ogr_layer.GetSpatialRef()
         if declaration_osr_sr is None:
@@ -461,7 +482,7 @@ def main() -> int:
             declaration_osr_sr.EPSGTreatsAsLatLong()
             or declaration_osr_sr.GetName() in latlon_sr_name_list
         )
-        logger.debug(f"Declarations layer's SRS: {declaration_osr_sr.GetName()}")
+        _user_logger.debug(f"Declarations layer's SRS: {declaration_osr_sr.GetName()}")
         ## Detections layer
         detection_table = ".".join(
             (
@@ -472,9 +493,8 @@ def main() -> int:
         detection_ogr_layer = ogr_pg_connection.GetLayerByName(detection_table)
         if detection_ogr_layer is None:
             raise Exception(f"Detection layer '{detection_table}' was not loaded.")
-        logger.log(
-            TRACE,
-            f"FID column for detection layer: '{detection_ogr_layer.GetFIDColumn()}'",
+        _user_logger.debug(
+            f"FID column for detection layer: '{detection_ogr_layer.GetFIDColumn()}'"
         )
         detection_osr_sr = detection_ogr_layer.GetSpatialRef()
         if detection_osr_sr is None:
@@ -485,7 +505,7 @@ def main() -> int:
             detection_osr_sr.EPSGTreatsAsLatLong()
             or detection_osr_sr.GetName() in latlon_sr_name_list
         )
-        logger.debug(f"Detections layer's SRS: {detection_osr_sr.GetName()}")
+        _user_logger.debug(f"Detections layer's SRS: {detection_osr_sr.GetName()}")
         ## Pairing layer
         pairing_table = ".".join(
             (
@@ -502,24 +522,22 @@ def main() -> int:
             False  # True if the two spatial references use a different axis order
         )
         if detection_osr_sr != declaration_osr_sr:
-            logger.debug("Coordinates transformation is necessary.")
+            _user_logger.debug("Coordinates transformation is necessary.")
             coordinates_transformation = osr.CoordinateTransformation(
                 declaration_osr_sr, detection_osr_sr
             )
-            need_coordinates_swap = (
-                is_detection_sr_latlon and not is_declaration_sr_latlon
-            ) or (is_declaration_sr_latlon and not is_detection_sr_latlon)
+            need_coordinates_swap = (is_detection_sr_latlon and not is_declaration_sr_latlon) or (
+                is_declaration_sr_latlon and not is_detection_sr_latlon
+            )
             if need_coordinates_swap:
-                logger.debug(
-                    "Axis order swapping is necessary for this transformation."
-                )
+                _user_logger.debug("Axis order swapping is necessary for this transformation.")
         # Check for duplicates in declarations
-        logger.info("Checking for conflicting declarations...")
+        _user_logger.info("Checking for conflicting declarations...")
         dupe_dec_set = check_declared_parcels(declaration_ogr_layer)
-        logger.info("Deleting conflicting declarations from database...")
+        _user_logger.info("Deleting conflicting declarations from database...")
         delete_before_matching(configuration["main_database"], dupe_dec_set)
         # Pairing
-        logger.info("Matching pairs...")
+        _user_logger.info("Matching pairs...")
         match_dict = match_dec_to_det(
             declaration_ogr_layer,
             detection_ogr_layer,
@@ -527,14 +545,15 @@ def main() -> int:
             coordinates_transformation,
             need_coordinates_swap,
         )
-        logger.info("Writing new pairs in database...")
+        _user_logger.info("Writing new pairs in database...")
         insert_new(configuration["main_database"], match_dict["new"])
-        logger.info("Deleting conflicting pairs from database...")
+        _user_logger.info("Deleting conflicting pairs from database...")
         delete_after_matching(configuration["main_database"], match_dict["del"])
-        logger.info("End of declarations' pairing with detections.")
+        _user_logger.info("End of declarations' pairing with detections.")
         return 0
     except Exception:
-        logger.error(traceback.format_exc())
+        _admin_logger.error(traceback.format_exc())
+        _user_logger.error("Failed pairing declarations to detections.")
         return 1
 
 

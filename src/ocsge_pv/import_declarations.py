@@ -23,9 +23,10 @@ This file contains the following functions :
     * main - main function of the script
 """
 
-# -- IMPORTS --
+# -- IMPORTS
 
 
+## from stdlib
 import argparse
 import json
 import logging
@@ -35,8 +36,10 @@ import sys
 import traceback
 from copy import deepcopy
 from datetime import date, datetime
+from os import getenv
 from pathlib import Path
 
+## third party
 import jsonschema
 import psycopg
 from gql import Client, gql
@@ -45,17 +48,22 @@ from gql.transport.aiohttp import log as AIOHTTPTransport_logger
 from osgeo import ogr, osr
 from psycopg import sql
 
+# from current project
+from ocsge_pv.custom_logging import LoggerInterface
+
 # -- GLOBALS --
 
 
 NAME = "import_declarations"
 logging.basicConfig(
     level=logging.INFO,
-    format=r"%(asctime)s %(name)s\(%(funcName)s\) %(levelname)s: %(message)s",
+    format="%(asctime)s %(name)s(%(funcName)s) %(levelname)s: %(message)s",
 )
-# logging.captureWarnings(True)
+logging.captureWarnings(True)
 AIOHTTPTransport_logger.setLevel(logging.WARNING)
-logger = logging.getLogger(NAME)
+_base_logger = logging.getLogger(name=NAME)
+_user_logger = LoggerInterface(_base_logger, "USER || ")
+_admin_logger = LoggerInterface(_base_logger, "")
 ogr.UseExceptions()
 osr.UseExceptions()
 SOURCE_SRID = 4326
@@ -69,11 +77,10 @@ SOURCE_SRS.ImportFromEPSG(SOURCE_SRID)  # Axes order: (latitude, longitude)
 def cli_arg_parser() -> argparse.Namespace:
     """Parse CLI arguments
 
-    Args:
-        * sys.argv (implicit) - CLI arguments
+    Extract execution parameters from sys.argv
 
     Returns:
-        argparse.Namespace: processed arguments
+        Processed arguments
     """
     parser = argparse.ArgumentParser(
         prog=NAME,
@@ -84,7 +91,32 @@ def cli_arg_parser() -> argparse.Namespace:
     )
     parser.add_argument("path", type=Path, help="the path of the configuration file for %(prog)s")
     parser.add_argument(
-        "-v", "--verbose", dest="verbose", action="store_true", help="output more logs"
+        "-v",
+        "--verbose",
+        dest="verbose",
+        action="store_true",
+        help="Output more logs (Equivalent to --logging_level=DEBUG)",
+    )
+    parser.add_argument(
+        "--logging_level",
+        choices=["ERROR", "WARNING", "INFO", "DEBUG"],
+        dest="logging_level",
+        default=getenv("OCSGE_PV_LOGGING_LEVEL", None),
+        help="Explicit minimal log level: 'ERROR', 'WARNING', 'INFO' (default), 'DEBUG'. (Overrides option -v/--verbose.)",
+    )
+    parser.add_argument(
+        "--a_pfx",
+        "--admin_prefix",
+        dest="admin_prefix",
+        default=getenv("OCSGE_PV_LOGGING_ADMIN_PREFIX", None),
+        help="Desired prefix for restricted (admin level) log messages. Defaults to no prefix.",
+    )
+    parser.add_argument(
+        "--u_pfx",
+        "--user_prefix",
+        dest="user_prefix",
+        default=getenv("OCSGE_PV_LOGGING_USER_PREFIX", None),
+        help="Desired prefix for public (unprivileged, user level) log messages. Defaults to 'USER || '.",
     )
     return parser.parse_args()
 
@@ -93,10 +125,10 @@ def format_feature(in_data: dict) -> dict:
     """Transform declaration dossier to postgis feature
 
     Args:
-        in_data (Dict): dossier's data for a single declaration
+        in_data: dossier's data for a single declaration
 
     Returns:
-        Dict: structure to insert in the output database
+        Structure to insert in the output database
     """
     out_data = {
         "id_dossier": None,
@@ -348,7 +380,7 @@ def format_feature(in_data: dict) -> dict:
                                 parcel_geom = parcel_geom.MakeValid()
                                 tmp_geometry = geometry.Clone()
                                 geometry = tmp_geometry.Union(parcel_geom)
-                                logger.debug(
+                                _admin_logger.debug(
                                     "geometry type for parcel "
                                     + f"'{parcel_uid}': {parcel_geom.GetGeometryName()}"
                                 )
@@ -356,23 +388,28 @@ def format_feature(in_data: dict) -> dict:
                                 contains_raw_geometry = True
                         tmp_geometry = geometry.Clone()
                         geometry = ogr.ForceToMultiPolygon(tmp_geometry.MakeValid())
-                        logger.debug(
+                        _admin_logger.debug(
                             "geometry type for dossier "
                             + f"'{dossier_number}': {geometry.GetGeometryName()}"
                         )
                         if len(parcels_list) == 0:
-                            logger.warning(
+                            _user_logger.warning(
                                 f"dossier '{dossier_number}' contains no selected parcel."
                             )
                         if contains_raw_geometry:
-                            logger.warning(f"dossier '{dossier_number}' contains raw geometries")
+                            _user_logger.warning(
+                                f"dossier '{dossier_number}' contains raw geometries"
+                            )
                 except (KeyError, TypeError, ValueError) as exc:
                     exc_type = str(type(exc)).replace("<class '", "").replace("'>", "")
                     message = (
                         f"on dossier '{dossier_number}', champ '{field_name}'"
                         + f" -- {exc_type}: {exc.args[0]}"
                     )
-                    logger.warning(message)
+                    _admin_logger.warning(message)
+                    _user_logger.warning(
+                        f"Invalid field '{field_name}' in dossier '{dossier_number}'."
+                    )
         try:
             if out_data["porteur"]:
                 out_data["siret_port"] = str(in_data["demandeur"]["siret"])
@@ -382,7 +419,7 @@ def format_feature(in_data: dict) -> dict:
                 out_data["num_parcelles"] = ";".join(parcels_list)
             out_data["geom"] = geometry
         except Exception as exc:
-            logger.error(f"on dossier '{dossier_number}'")
+            _user_logger.error(f"Failed reading dossier '{dossier_number}'")
             raise exc
     return out_data
 
@@ -391,15 +428,13 @@ def format_source_result(data: list[dict]) -> list[dict]:
     """Transform input data to output data
 
     Args:
-        data (List[Dict]): raw data as returned by query_source_api
+        data: raw data as returned by query_source_api
 
     Returns:
-        List[Dict]: features list with the target SQL table structure
+        Features list with the target SQL table structure
     """
     feature_list = []
     id_list = []
-    # debug_input_str = json.dumps(data, sort_keys=True, default=str)
-    # logger.debug(f"Raw input data: {debug_input_str}")
     for page in data["demarche"]["dossiers"]:
         for entry in page["nodes"]:
             if entry["number"] not in id_list:
@@ -407,8 +442,6 @@ def format_source_result(data: list[dict]) -> list[dict]:
                 feature = format_feature(entry)
                 feature_list.append(feature)
     feature_list.sort(key=lambda feature: feature["id_dossier"])
-    # debug_output_str = json.dumps(feature_list, sort_keys=True, default=str)
-    # logger.debug(f"Output data: {debug_output_str}")
     return deepcopy(feature_list)
 
 
@@ -416,10 +449,10 @@ def get_deleted_dossier_list(data: list[dict]) -> set:
     """Extract deleted dossiers from input data
 
     Args:
-        data (List[Dict]): raw data as returned by query_source_api
+        data: raw data as returned by query_source_api
 
     Returns:
-        set: deleted dossiers id set
+        Deleted dossiers id set
     """
     id_set = set()
     for page in data["demarche"]["deletedDossiers"]:
@@ -432,14 +465,14 @@ def load_configuration(path: Path) -> dict:
     """Returns validated configuration from file
 
     Args:
-        path (str): path to the configuration file
+        path: path to the configuration file
 
     Raises:
         jonschema.ValidationError: The configuration file does
             not match the validation schema
 
     Returns:
-        Dict: the configuration object translated from the input file
+        The configuration object translated from the input file
     """
     try:
         resource_dir = os.environ.get("OCSGE_PV_RESOURCE_DIR")
@@ -467,8 +500,22 @@ def load_configuration(path: Path) -> dict:
             + " password="
             + modified_configuration["output"]["password"]
         )
+        if (
+            source_configuration["input"]["auth_token"] is None
+            or source_configuration["input"]["auth_token"] == ""
+        ):
+            modified_configuration["input"]["auth_token"] = os.environ.get("DS_GQL_API_AUTH")
+        if (
+            modified_configuration["input"]["auth_token"] is None
+            or source_configuration["input"]["auth_token"] == ""
+        ):
+            raise ValueError(
+                "Source API auth token is empty both in the configuration file and in the 'DS_GQL_API_AUTH' environment variable."
+            )
         return modified_configuration
     except Exception as exc:
+        _admin_logger.error(traceback.format_exc())
+        _user_logger.error(f"Failed loading configuration '{path}'.")
         raise exc
 
 
@@ -476,8 +523,8 @@ def mark_as_deleted(output_conf: dict, data: set) -> None:
     """Write declarations to database
 
     Args:
-        output_conf (Dict): configuration used to access the database
-        data (set): set of deleted dossiers id
+        output_conf: configuration used to access the database
+        data: set of deleted dossiers id
     """
     with psycopg.connect(output_conf["_pg_string"], autocommit=True) as conn:
         cur = conn.cursor()
@@ -509,6 +556,8 @@ def mark_as_deleted(output_conf: dict, data: set) -> None:
                             + f"{feature['id_dossier']}: {id_count_row[0]} entries found."
                         )
         except Exception as exc:
+            _admin_logger.error(traceback.format_exc())
+            _user_logger.error(f"Error while marking this dossiers as deleted: {data}.")
             conn.rollback()
             raise exc
 
@@ -517,10 +566,10 @@ def query_source_api(input_conf: dict) -> list[dict]:
     """Read input data from the source GraphQL API
 
     Args:
-        input_conf (Dict): configuration used to access the API
+        input_conf: configuration used to access the API
 
     Returns:
-        List[Dict]: The converted input data structured almost like
+        The converted input data structured almost like
             the original full response model, but with the properties
             "demarche"."dossiers" and "demarche"."deletedDossiers"
             expressed as lists of pages.
@@ -609,8 +658,8 @@ def write_output(output_conf: dict, data: list) -> None:
     """Write declarations to database
 
     Args:
-        output_conf (Dict): configuration used to access the database
-        data (List): list of output data to insert
+        output_conf: configuration used to access the database
+        data: list of output data to insert
     """
     keys_list = None
     line_writing_mode = None
@@ -638,14 +687,14 @@ def write_output(output_conf: dict, data: list) -> None:
                         },
                     ).fetchone()[0]
                 )
-                logger.debug(f"Output table SRID: {repr(out_srid)}")
+                _user_logger.debug(f"Output table SRID: {repr(out_srid)}")
                 if out_srid == SOURCE_SRID:
                     out_srs = SOURCE_SRS.Clone()
-                    logger.debug(f"Output table SRID's name: {out_srs.GetName()}")
+                    _user_logger.debug(f"Output table SRID's name: {out_srs.GetName()}")
                 else:
                     out_srs = osr.SpatialReference()
                     out_srs.ImportFromEPSG(out_srid)
-                    logger.debug(f"Output table SRID's name: {out_srs.GetName()}")
+                    _user_logger.debug(f"Output table SRID's name: {out_srs.GetName()}")
                     coord_transform = osr.CreateCoordinateTransformation(SOURCE_SRS, out_srs)
                 if out_srs.EPSGTreatsAsLatLong() == 1 or out_srs.EPSGTreatsAsNorthingEasting() == 1:
                     swap = True
@@ -719,22 +768,24 @@ def write_output(output_conf: dict, data: list) -> None:
                             value_dict,
                         )
         except psycopg.Error as exc:
-            logger.error(f"PostgreSQL error code: {exc.sqlstate}")
-            logger.error(f"PG_DIAG_CONTEXT: {exc.diag.context}")
-            logger.error(f"PG_DIAG_MESSAGE_PRIMARY: {exc.diag.message_primary}")
-            logger.error(f"PG_DIAG_MESSAGE_DETAIL: {exc.diag.message_detail}")
-            logger.error(f"PG_DIAG_MESSAGE_HINT: {exc.diag.message_hint}")
-            logger.error(
+            _admin_logger.error(f"PostgreSQL error code: {exc.sqlstate}")
+            _admin_logger.error(f"PG_DIAG_CONTEXT: {exc.diag.context}")
+            _admin_logger.error(f"PG_DIAG_MESSAGE_PRIMARY: {exc.diag.message_primary}")
+            _admin_logger.error(f"PG_DIAG_MESSAGE_DETAIL: {exc.diag.message_detail}")
+            _admin_logger.error(f"PG_DIAG_MESSAGE_HINT: {exc.diag.message_hint}")
+            _admin_logger.error(
                 f"Cursor query: (raw_query: {cur._query.query}, parameters: {cur._query.params})"
             )
             conn.rollback()
-            logger.error(f"Line writing mode: '{line_writing_mode}'\n")
-            logger.error(f"Values mapping: '{value_dict}'\n")
+            _admin_logger.error(f"Line writing mode: '{line_writing_mode}'\n")
+            _admin_logger.error(f"Values mapping: '{value_dict}'\n")
+            _user_logger.error("Failed writing declarations in database.")
             raise exc
         except Exception as exc:
             conn.rollback()
-            logger.error(f"Line writing mode: '{line_writing_mode}'\n")
-            logger.error(f"Values mapping: '{value_dict}'\n")
+            _admin_logger.error(f"Line writing mode: '{line_writing_mode}'\n")
+            _admin_logger.error(f"Values mapping: '{value_dict}'\n")
+            _user_logger.error("Failed writing declarations in database.")
             raise exc
 
 
@@ -744,32 +795,41 @@ def write_output(output_conf: dict, data: list) -> None:
 def main() -> int:
     """Main routine, entrypoint for the program
 
-    Args:
-        path (str): path to the configuration file
-            (implicit, contained in sys.argv[])
+    No argument. Those are extracted from the CLI.
+    See cli_arg_parser().
 
     Returns:
-        int: shell exit code of the execution
+        Shell exit code of the execution
     """
     try:
-        logger.info("Start of declaration data import.")
+        _user_logger.info("Start of declaration data import.")
         cli_args = cli_arg_parser()
-        if cli_args.verbose:
-            logger.setLevel(logging.DEBUG)
-        logger.info("Loading configuration...")
+        # Configure logging
+        if cli_args.admin_prefix is not None:
+            _admin_logger.set_prefix(cli_args.admin_prefix)
+        if cli_args.user_prefix is not None:
+            _user_logger.set_prefix(cli_args.user_prefix)
+        if cli_args.logging_level:
+            _base_logger.setLevel(cli_args.logging_level)
+        elif cli_args.verbose:
+            _base_logger.setLevel(logging.DEBUG)
+        else:
+            _base_logger.setLevel(logging.INFO)
+        _user_logger.info("Loading configuration...")
         configuration = load_configuration(cli_args.path)
-        logger.info("Fetching data...")
+        _user_logger.info("Fetching data...")
         input_data = query_source_api(configuration["input"])
         deleted_data = get_deleted_dossier_list(input_data)
-        logger.info("Formating data...")
+        _user_logger.info("Formating data...")
         output_data = format_source_result(input_data)
-        logger.info("Writing into database...")
+        _user_logger.info("Writing into database...")
         write_output(configuration["output"], output_data)
         mark_as_deleted(configuration["output"], deleted_data)
-        logger.info("End of declaration data import.")
+        _user_logger.info("End of declaration data import.")
         return 0
     except Exception:
-        logger.error(traceback.format_exc())
+        _admin_logger.error(traceback.format_exc())
+        _user_logger.error("Failed importing declarations.")
         return 1
 
 

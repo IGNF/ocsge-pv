@@ -6,20 +6,7 @@ networks:
 
 services:
   main:
-    build:
-      args:
-        - HOST_UID=$HOST_UID
-        - HOST_GID=$HOST_GID
-        - http_proxy=$http_proxy
-        - HTTP_PROXY=$HTTP_PROXY
-        - https_proxy=$https_proxy
-        - HTTPS_PROXY=$HTTPS_PROXY
-      context: $OCSGE_PV_REPO_PATH/
-      dockerfile: $OCSGE_PV_REPO_PATH/Dockerfile
-      network: host
-      tags:
-        - "local/ignf/ocsge-pv:latest"
-        - "local/ignf/ocsge-pv:nover"
+    image: ghcr.io/ignf/ocsge-pv
     command: sleep 7d
     depends_on:
       postgresql:
@@ -42,7 +29,6 @@ services:
       PGPORT: "5432"
       PGUSER: "entrepot"
       TZ: ${TZ:-Europe/Paris}
-    image: local/ignf/ocsge-pv:nover
     links:
       - postgresql:storage_bdd.localhost
     networks:
@@ -58,6 +44,7 @@ services:
       - $OCSGE_PV_SQL_SCRIPTS_PATH:/home/user/sql
 
   dev:
+    image: local/ignf/ocsge-pv-dev:nover
     build:
       args:
         - HOST_UID=$HOST_UID
@@ -94,7 +81,6 @@ services:
       PGPORT: "5432"
       PGUSER: "entrepot"
       TZ: ${TZ:-Europe/Paris}
-    image: local/ignf/ocsge-pv-dev:nover
     links:
       - postgresql:storage_bdd.localhost
     networks:
@@ -110,6 +96,7 @@ services:
       - $OCSGE_PV_SQL_SCRIPTS_PATH:/home/user/sql
 
   initdb:
+    image: postgis/postgis:14-3.4
     command: ["psql", "-f", "/opt/sql_scripts/init-db-import_declarations.sql", "-f", "/opt/sql_scripts/init-db-paired_data.no_id_generation.sql" ]
     depends_on:
       postgresql:
@@ -122,13 +109,13 @@ services:
       PGUSER: "entrepot"
       TZ: ${TZ:-Europe/Paris}
     entrypoint: []
-    image: postgis/postgis:14-3.4
     networks:
       - default
     volumes:
       - $OCSGE_PV_SQL_SCRIPTS_PATH:/opt/sql_scripts
 
   postgresql:
+    image: postgis/postgis:14-3.4
     environment:
       ALLOW_IP_RANGE: "0.0.0.0/0"
       HOST_UID: $HOST_UID
@@ -142,7 +129,6 @@ services:
       timeout: 60s
       retries: 5
     hostname: storage_bdd.localhost
-    image: postgis/postgis:14-3.4
     networks:
       - default
     ports:
