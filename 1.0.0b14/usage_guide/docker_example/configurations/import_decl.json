@@ -1,0 +1,16 @@
+{
+    "output": {
+        "host": "storage_bdd.localhost",
+        "port": 5432,
+        "name": "datastore",
+        "user": "utilisateur_traitement",
+        "password": "mdp_traitement",
+        "schema": "raw_import",
+        "table": "declaration"
+    },
+    "input": {
+        "api_url": "https://demarche.numerique.gouv.fr/api/v2/graphql",
+        "auth_token": "A9Knc34tP==",
+        "demarche_id": 86067
+    }
+}

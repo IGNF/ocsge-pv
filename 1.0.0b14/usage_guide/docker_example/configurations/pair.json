@@ -1,0 +1,15 @@
+{
+    "main_database": {
+        "host": "storage_bdd.localhost",
+        "port": 5432,
+        "name": "datastore",
+        "user": "utilisateur_traitement",
+        "password": "mdp_traitement",
+        "schema": "pairing",
+        "tables": {
+            "detections": "detection",
+            "declarations": "declaration",
+            "links": "declaration_detection"
+        }
+    }
+}

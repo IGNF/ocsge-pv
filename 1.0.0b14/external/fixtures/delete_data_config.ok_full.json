@@ -1,0 +1,32 @@
+{
+    "main_database": {
+        "host": "192.168.0.1",
+        "port": 5432,
+        "name": "ocsge",
+        "user": "data_producer",
+        "password": "bip-boop-123456",
+        "schema": "pairing",
+        "tables": {
+            "detections": "detection",
+            "declarations": "declaration",
+            "links": "declaration_detection"
+        }
+    },
+    "to_delete": {
+        "declarations": [
+            298654,
+            326874
+        ],
+        "detections": [
+            "2018SURFACTI0000002200338431",
+            "2019SURFACTI0000002200338431",
+            "2018SURFACTI0000002200338598"
+        ],
+        "pairs": [
+            {
+                "declaration": 308463,
+                "detection": "2019SURFACTI0000002200338598"
+            }
+        ]
+    }
+}
